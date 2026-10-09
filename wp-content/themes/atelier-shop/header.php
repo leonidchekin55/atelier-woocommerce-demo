@@ -2,7 +2,7 @@
 <html <?php language_attributes(); ?>>
 <head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width, initial-scale=1"><?php wp_head(); ?></head>
 <body <?php body_class(); ?>><?php wp_body_open(); ?>
-<div class="announcement">Thoughtful objects for a slower home <span>— Free delivery over $150</span></div>
+<div class="announcement">Thoughtful objects for a slower home <span>— Free delivery on orders of $150 or more</span></div>
 <header class="site-header"><div class="header-inner">
     <button class="menu-toggle" aria-label="Open menu" aria-expanded="false"><i></i><i></i></button>
     <a class="wordmark" href="<?php echo esc_url(home_url('/')); ?>">ATELIER<span> &nbsp; / &nbsp; HOME</span></a>

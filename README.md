@@ -42,4 +42,4 @@ All brand names, products, prices and copy are fictional demo content. Replace t
 4. Configure a payment provider in sandbox mode first, test orders/refunds/webhooks, then switch to live credentials only when ready.
 5. Enable HTTPS, backups, updates and production caching. Never deploy the Docker sample database credentials to a public server.
 
-Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. See the hosting link in the project handoff; the Render Free preview is disposable and not a production store.
+Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. Public Render preview: <https://atelier-woocommerce-demo.onrender.com>. The Render Free preview is disposable and not a production store.
