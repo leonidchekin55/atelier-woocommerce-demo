@@ -3,6 +3,15 @@ if (!defined('ABSPATH')) exit;
 
 add_action('init', function () {
     if (!class_exists('WooCommerce') || get_option('atelier_catalog_seeded')) return;
+    $lock_key = 'atelier_catalog_seed_lock';
+    if (!add_option($lock_key, time(), '', false)) {
+        $lock_time = (int)get_option($lock_key, 0);
+        if (!$lock_time || time() - $lock_time <= 300) return;
+        delete_option($lock_key);
+        if (!add_option($lock_key, time(), '', false)) return;
+    }
+
+    try {
     $attributes = ['color' => ['Color', ['Sand', 'Ivory', 'Olive', 'Terracotta']], 'material' => ['Material', ['Stoneware', 'Linen', 'Oak', 'Glass']]];
     foreach ($attributes as $slug => [$label, $terms]) {
         if (!taxonomy_exists('pa_' . $slug)) {
@@ -35,12 +44,12 @@ add_action('init', function () {
         ['Evening glass pair', 'Two light, durable tumblers made for water, wine, or a small something after dinner.', 58, 'Objects', 'Glass', 'Ivory', 'photo-1572119865084-43c285814d63'],
     ];
     foreach ($products as [$name, $description, $price, $category, $material, $color, $photo]) {
-        $exists = get_posts(['post_type' => 'product', 'title' => $name, 'numberposts' => 1, 'fields' => 'ids']);
-        if ($exists) continue;
+        $sku = 'AT-' . strtoupper(substr(md5($name), 0, 6));
+        if (wc_get_product_id_by_sku($sku)) continue;
         $product = new WC_Product_Simple();
         $product->set_name($name); $product->set_status('publish'); $product->set_catalog_visibility('visible');
         $product->set_description($description); $product->set_short_description('Thoughtfully made, ready for everyday.');
-        $product->set_regular_price((string)$price); $product->set_sku('AT-' . strtoupper(substr(md5($name), 0, 6)));
+        $product->set_regular_price((string)$price); $product->set_sku($sku);
         $product->set_manage_stock(false); $product->set_stock_status('instock');
         $id = $product->save();
         wp_set_object_terms($id, [$categories[$category]], 'product_cat');
@@ -49,6 +58,9 @@ add_action('init', function () {
         update_post_meta($id, '_atelier_photo', $photo);
     }
     update_option('atelier_catalog_seeded', 1);
+    } finally {
+        delete_option($lock_key);
+    }
 }, 99);
 
 add_filter('woocommerce_product_get_image', function ($html, $product, $size, $attr, $placeholder, $image) {
