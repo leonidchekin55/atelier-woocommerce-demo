@@ -18,9 +18,8 @@ function atelier_filter_form() {
     </form><?php
 }
 
-add_action('woocommerce_before_shop_loop', function () {
-    if (!is_shop() && !is_product_taxonomy()) return;
+function atelier_filter_sidebar() {
     echo '<button class="filter-toggle" type="button" aria-expanded="false">Filters <span>＋</span></button><aside class="shop-sidebar">';
     echo '<div class="sidebar-title"><strong>Refine</strong><button class="filter-close" type="button" aria-label="Close filters">×</button></div>';
     atelier_filter_form(); echo '</aside><div class="filter-scrim"></div>';
-}, 5);
+}
