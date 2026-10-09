@@ -12,7 +12,7 @@ docker compose up -d
 
 On a fresh clone, open <http://localhost:8080>, complete the WordPress installer, then install and activate **WooCommerce** (the official plugin) in **Plugins → Add New Plugin** and activate **Atelier Shop** in **Appearance → Themes**. On first theme activation the demo creates its pages, product catalog and product attributes. Its local Apache configuration supports normal WordPress permalinks.
 
-The already initialized local instance uses `atelier_admin` as its administrator; its password was created for this local demo and provided in the handoff chat. Change it in **Users → Profile** if you keep using this instance. WooCommerce is active, sample products are loaded, store visibility is enabled, and offline **Cash on delivery** is enabled for test orders. No real payment provider is configured. Set currency, country, shipping and tax in WooCommerce settings to match your demo scenario.
+The already initialized local instance uses `atelier_admin` as its administrator; its local-only password was provided in the handoff chat. Change it in **Users → Profile** if you keep using this instance. WooCommerce is active, sample products are loaded, store visibility is enabled, and offline **Cash on delivery** is enabled for test orders. No real payment provider is configured. The demo shipping zone accepts US addresses at $8 standard delivery, with free delivery above $150. These are sample terms; no orders are fulfilled.
 
 The built-in catalog seed runs once and adds 12 fictional homeware products with prices, categories, colors and materials. WooCommerce handles category browsing, search, sorting, pagination, product detail, cart, checkout and account. Shop filters are provided by the theme for category, price, color and material. The checkout creates an order in WooCommerce; keep payments in an offline/test mode.
 
@@ -22,17 +22,24 @@ To stop: `docker compose down`. To erase the local database and uploads as well:
 
 - Custom WordPress theme with editorial home page, shop, about, journal, contact and FAQ pages.
 - WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling.
-- One-time sample catalog provisioning and sensible WooCommerce defaults.
+- One-time sample catalog and demo checkout provisioning, including US shipping methods.
+- Private WordPress inbox and newsletter list with consent, nonce checks and spam honeypot fields. Form submissions are stored in wp-admin; this demo does not send email.
 - Docker Compose with MariaDB and persistent local volumes.
 
 All brand names, products, prices and copy are fictional demo content. Replace them before any public launch.
 
 ## Deployment outline
 
-1. Provision a host with current PHP supported by WordPress, MySQL/MariaDB, HTTPS and persistent media storage (or use a managed WordPress host).
-2. Install WordPress and WooCommerce. Upload `wp-content/themes/atelier-shop` and activate Atelier Shop.
-3. Add real products and product attributes in WooCommerce; replace demo copy and imagery, configure shipping/tax, privacy and legal pages.
-4. Configure a payment provider in its sandbox first, test orders/refunds/webhooks, then switch to live credentials only when ready.
-5. Enable HTTPS, backups, updates and production caching. Do not deploy the Docker sample database credentials to a public server.
+### Railway demo container
 
-This workspace contains a local demo source project. It has not been published to a public host or pushed to GitHub.
+`Dockerfile.railway` packages WordPress, WooCommerce, Atelier Shop and MariaDB in one container for low-cost demo hosting. In Railway, create a service from this repository, select `Dockerfile.railway`, attach a persistent volume at `/var/lib/atelier`, set a unique `WORDPRESS_DB_PASSWORD`, and generate a public domain on port 80. Complete the WordPress installer and create a new administrator there; never reuse the local demo credentials. The volume stores MariaDB and uploads. Keep the service to one replica because this demo container runs one local database. This arrangement is for a low-traffic demo; use managed WordPress hosting or separate app/database services for a production shop. Railway currently declined resource provisioning on the account's free plan, so this deployment has not been created and no public site URL exists yet.
+
+### Production checklist
+
+1. Provision a host with current PHP supported by WordPress, MySQL/MariaDB, HTTPS and persistent media storage (or use managed WordPress hosting).
+2. Install WordPress and WooCommerce. Upload `wp-content/themes/atelier-shop` and activate Atelier Shop.
+3. Add real products and attributes; replace demo copy and imagery; configure shipping/tax, privacy and legal pages.
+4. Configure a payment provider in sandbox mode first, test orders/refunds/webhooks, then switch to live credentials only when ready.
+5. Enable HTTPS, backups, updates and production caching. Never deploy the Docker sample database credentials to a public server.
+
+Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. The WordPress site itself is a local demo and has not yet been published to a public host.

@@ -1,8 +1,8 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-add_action('admin_init', function () {
-    if (!current_user_can('manage_woocommerce') || !class_exists('WooCommerce') || get_option('atelier_catalog_seeded')) return;
+add_action('init', function () {
+    if (!class_exists('WooCommerce') || get_option('atelier_catalog_seeded')) return;
     $attributes = ['color' => ['Color', ['Sand', 'Ivory', 'Olive', 'Terracotta']], 'material' => ['Material', ['Stoneware', 'Linen', 'Oak', 'Glass']]];
     foreach ($attributes as $slug => [$label, $terms]) {
         if (!taxonomy_exists('pa_' . $slug)) {
@@ -49,7 +49,7 @@ add_action('admin_init', function () {
         update_post_meta($id, '_atelier_photo', $photo);
     }
     update_option('atelier_catalog_seeded', 1);
-});
+}, 99);
 
 add_filter('woocommerce_product_get_image', function ($html, $product, $size, $attr, $placeholder, $image) {
     $photo = get_post_meta($product->get_id(), '_atelier_photo', true);

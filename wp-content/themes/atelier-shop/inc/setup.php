@@ -53,4 +53,25 @@ add_action('init', function () {
     update_option('atelier_woo_demo_configured', 1);
 }, 30);
 
+add_action('init', function () {
+    if (!class_exists('WooCommerce') || get_option('atelier_demo_shipping_configured')) return;
+    $zone = new WC_Shipping_Zone();
+    $zone->set_zone_name('Atelier demo — United States');
+    $zone->set_zone_order(1);
+    $zone->add_location('US', 'country');
+    $zone->save();
+
+    $flat_rate_id = $zone->add_shipping_method('flat_rate');
+    if ($flat_rate_id) update_option('woocommerce_flat_rate_' . $flat_rate_id . '_settings', [
+        'title' => 'Standard delivery', 'tax_status' => 'none', 'cost' => '8.00',
+    ]);
+
+    $free_shipping_id = $zone->add_shipping_method('free_shipping');
+    if ($free_shipping_id) update_option('woocommerce_free_shipping_' . $free_shipping_id . '_settings', [
+        'title' => 'Free delivery', 'requires' => 'min_amount', 'min_amount' => '150.00', 'ignore_discounts' => 'no',
+    ]);
+
+    update_option('atelier_demo_shipping_configured', 1);
+}, 30);
+
 add_filter('woocommerce_enqueue_styles', '__return_empty_array');
