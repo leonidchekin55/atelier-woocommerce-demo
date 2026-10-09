@@ -1,14 +1,14 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.0.0');
+define('ATELIER_VERSION', '1.1.0');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/filters.php';
 require_once get_template_directory() . '/inc/forms.php';
 
 add_action('wp_enqueue_scripts', function () {
-    wp_enqueue_style('atelier-fonts', 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap', [], null);
+    wp_enqueue_style('atelier-fonts', get_template_directory_uri() . '/assets/css/fonts.css', [], ATELIER_VERSION);
     wp_enqueue_style('atelier-style', get_stylesheet_uri(), [], ATELIER_VERSION);
     wp_enqueue_style('atelier-main', get_template_directory_uri() . '/assets/css/main.css', ['atelier-style'], ATELIER_VERSION);
     wp_enqueue_style('atelier-editorial', get_template_directory_uri() . '/assets/css/editorial.css', ['atelier-main'], ATELIER_VERSION);

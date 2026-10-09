@@ -24,6 +24,7 @@ To stop: `docker compose down`. To erase the local database and uploads as well:
 - WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling.
 - One-time sample catalog and demo checkout provisioning, including US shipping methods.
 - Private WordPress inbox and newsletter list with consent, nonce checks and spam honeypot fields. Form submissions are stored in wp-admin; this demo does not send email.
+- Product and editorial photos are bundled as optimized WebP assets under the [Unsplash License](https://unsplash.com/license). DM Sans and Playfair Display are self-hosted, with their SIL Open Font License texts included in `assets/fonts`.
 - Docker Compose with MariaDB and persistent local volumes.
 
 All brand names, products, prices and copy are fictional demo content. Replace them before any public launch.

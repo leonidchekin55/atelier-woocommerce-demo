@@ -78,7 +78,7 @@ add_action('init', function () {
 add_filter('woocommerce_product_get_image', function ($html, $product, $size, $attr, $placeholder, $image) {
     $photo = get_post_meta($product->get_id(), '_atelier_photo', true);
     if (!$photo || $product->get_image_id()) return $html;
-    $url = 'https://images.unsplash.com/' . rawurlencode($photo) . '?auto=format&fit=crop&w=900&q=82';
+    $url = get_template_directory_uri() . '/assets/images/' . rawurlencode($photo) . '.webp';
     $alt = esc_attr($product->get_name());
     return '<img src="' . esc_url($url) . '" alt="' . $alt . '" loading="lazy" decoding="async">';
 }, 10, 6);
