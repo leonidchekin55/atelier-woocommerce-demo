@@ -19,7 +19,7 @@ function atelier_filter_form() {
 }
 
 function atelier_filter_sidebar() {
-    echo '<button class="filter-toggle" type="button" aria-expanded="false">Filters <span>＋</span></button><aside class="shop-sidebar">';
+    echo '<button class="filter-toggle" type="button" aria-controls="atelier-shop-filters" aria-expanded="false">Filters <span aria-hidden="true">＋</span></button><aside id="atelier-shop-filters" class="shop-sidebar">';
     echo '<div class="sidebar-title"><strong>Refine</strong><button class="filter-close" type="button" aria-label="Close filters">×</button></div>';
     atelier_filter_form(); echo '</aside><div class="filter-scrim"></div>';
 }

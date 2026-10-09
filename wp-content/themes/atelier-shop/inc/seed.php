@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 add_action('init', function () {
-    if (!class_exists('WooCommerce') || get_option('atelier_catalog_seeded')) return;
+    if (!class_exists('WooCommerce')) return;
     $lock_key = 'atelier_catalog_seed_lock';
     if (!add_option($lock_key, time(), '', false)) {
         $lock_time = (int)get_option($lock_key, 0);
@@ -57,7 +57,19 @@ add_action('init', function () {
         wp_set_object_terms($id, [sanitize_title($color)], 'pa_color');
         update_post_meta($id, '_atelier_photo', $photo);
     }
-    update_option('atelier_catalog_seeded', 1);
+    // Mark the catalog complete only when every expected SKU exists. This also
+    // repairs a partially seeded catalog after interrupted deploys or imports.
+    $expected_skus = array_map(static function ($product) {
+        return 'AT-' . strtoupper(substr(md5($product[0]), 0, 6));
+    }, $products);
+    $catalog_complete = true;
+    foreach ($expected_skus as $expected_sku) {
+        if (!wc_get_product_id_by_sku($expected_sku)) {
+            $catalog_complete = false;
+            break;
+        }
+    }
+    update_option('atelier_catalog_seeded', $catalog_complete ? 1 : 0);
     } finally {
         delete_option($lock_key);
     }
