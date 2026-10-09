@@ -30,9 +30,9 @@ All brand names, products, prices and copy are fictional demo content. Replace t
 
 ## Deployment outline
 
-### Railway demo container
+### Render free preview
 
-`Dockerfile.railway` packages WordPress, WooCommerce, Atelier Shop and MariaDB in one container for low-cost demo hosting. In Railway, create a service from this repository, select `Dockerfile.railway`, attach a persistent volume at `/var/lib/atelier`, set a unique `WORDPRESS_DB_PASSWORD`, and generate a public domain on port 80. Complete the WordPress installer and create a new administrator there; never reuse the local demo credentials. The volume stores MariaDB and uploads. Keep the service to one replica because this demo container runs one local database. This arrangement is for a low-traffic demo; use managed WordPress hosting or separate app/database services for a production shop. Railway currently declined resource provisioning on the account's free plan, so this deployment has not been created and no public site URL exists yet.
+`Dockerfile` packages WordPress, WooCommerce, Atelier Shop and MariaDB in one container. It can run as a free Render web service, with `WORDPRESS_DB_PASSWORD` set to a unique random value. Complete the WordPress installer and create a new administrator; never reuse the local demo credentials. Render Free has an ephemeral filesystem, so database and uploaded files can be lost after restarts or redeploys. Use this only as a portfolio preview with fictional test orders, never for a real shop. For a durable store, use a managed WordPress host or a service with a persistent disk and backups.
 
 ### Production checklist
 
@@ -42,4 +42,4 @@ All brand names, products, prices and copy are fictional demo content. Replace t
 4. Configure a payment provider in sandbox mode first, test orders/refunds/webhooks, then switch to live credentials only when ready.
 5. Enable HTTPS, backups, updates and production caching. Never deploy the Docker sample database credentials to a public server.
 
-Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. The WordPress site itself is a local demo and has not yet been published to a public host.
+Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. See the hosting link in the project handoff; the Render Free preview is disposable and not a production store.
