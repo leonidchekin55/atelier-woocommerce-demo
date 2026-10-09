@@ -5,18 +5,48 @@ function atelier_filter_form() {
     if (!function_exists('is_shop') || !(is_shop() || is_product_taxonomy())) return;
     $min = isset($_GET['min_price']) ? wc_clean(wp_unslash($_GET['min_price'])) : '';
     $max = isset($_GET['max_price']) ? wc_clean(wp_unslash($_GET['max_price'])) : '';
-    $color = isset($_GET['filter_color']) ? wc_clean(wp_unslash($_GET['filter_color'])) : '';
-    $material = isset($_GET['filter_material']) ? wc_clean(wp_unslash($_GET['filter_material'])) : '';
+    $color = isset($_GET['atelier_color']) ? array_map('sanitize_title', (array)wp_unslash($_GET['atelier_color'])) : [];
+    $material = isset($_GET['atelier_material']) ? array_map('sanitize_title', (array)wp_unslash($_GET['atelier_material'])) : [];
     ?>
     <form class="atelier-filters" method="get" action="<?php echo esc_url(wc_get_page_permalink('shop')); ?>">
         <div class="filter-block"><h3>Price range</h3><div class="price-inputs"><label><span>From</span><input type="number" min="0" name="min_price" placeholder="0" value="<?php echo esc_attr($min); ?>"></label><label><span>To</span><input type="number" min="0" name="max_price" placeholder="500" value="<?php echo esc_attr($max); ?>"></label></div></div>
-        <?php foreach (['color' => ['Color', 'pa_color'], 'material' => ['Material', 'pa_material']] as $key => [$label, $taxonomy]): $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]); if (is_wp_error($terms) || !$terms) continue; ?>
-            <div class="filter-block"><h3><?php echo esc_html($label); ?></h3><?php foreach ($terms as $term): ?><label class="check-option"><input type="checkbox" name="filter_<?php echo esc_attr($key); ?>[]" value="<?php echo esc_attr($term->slug); ?>" <?php checked(in_array($term->slug, (array)$color, true) && $key === 'color'); checked(in_array($term->slug, (array)$material, true) && $key === 'material'); ?>><span><?php echo esc_html($term->name); ?></span></label><?php endforeach; ?></div>
+        <?php foreach (['color' => ['Color', 'pa_color', $color], 'material' => ['Material', 'pa_material', $material]] as $key => [$label, $taxonomy, $selected]): $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]); if (is_wp_error($terms) || !$terms) continue; ?>
+            <div class="filter-block"><h3><?php echo esc_html($label); ?></h3><?php foreach ($terms as $term): ?><label class="check-option"><input type="checkbox" name="atelier_<?php echo esc_attr($key); ?>[]" value="<?php echo esc_attr($term->slug); ?>" <?php checked(in_array($term->slug, $selected, true)); ?>><span><?php echo esc_html($term->name); ?></span></label><?php endforeach; ?></div>
         <?php endforeach; ?>
         <button class="button button-dark" type="submit">Apply filters</button>
+        <?php if ($min !== '' || $max !== '' || $color || $material): ?><a class="filter-reset" href="<?php echo esc_url(remove_query_arg(['min_price', 'max_price', 'atelier_color', 'atelier_material'])); ?>">Clear filters</a><?php endif; ?>
         <?php if (is_product_taxonomy()): ?><input type="hidden" name="product_cat" value="<?php echo esc_attr(get_queried_object()->slug); ?>"><?php endif; ?>
     </form><?php
 }
+
+add_action('woocommerce_product_query', function ($query) {
+    $filters = [
+        'atelier_color' => 'pa_color',
+        'atelier_material' => 'pa_material',
+    ];
+    $tax_query = (array)$query->get('tax_query');
+
+    foreach ($filters as $parameter => $taxonomy) {
+        if (!isset($_GET[$parameter])) continue;
+        $terms = array_values(array_unique(array_filter(array_map(
+            'sanitize_title',
+            (array)wp_unslash($_GET[$parameter])
+        ))));
+        if (!$terms || !taxonomy_exists($taxonomy)) continue;
+
+        $tax_query[] = [
+            'taxonomy' => $taxonomy,
+            'field' => 'slug',
+            'terms' => $terms,
+            'operator' => 'IN',
+        ];
+    }
+
+    if (count($tax_query) > 0) {
+        $tax_query['relation'] = $tax_query['relation'] ?? 'AND';
+        $query->set('tax_query', $tax_query);
+    }
+}, 20);
 
 function atelier_filter_sidebar() {
     echo '<button class="filter-toggle" type="button" aria-controls="atelier-shop-filters" aria-expanded="false">Filters <span aria-hidden="true">＋</span></button><aside id="atelier-shop-filters" class="shop-sidebar">';

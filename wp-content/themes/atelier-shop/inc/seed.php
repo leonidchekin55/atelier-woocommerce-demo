@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 add_action('init', function () {
-    if (!class_exists('WooCommerce')) return;
+    if (!class_exists('WooCommerce') || (get_option('atelier_catalog_seeded') && get_option('atelier_catalog_attributes_seeded'))) return;
     $lock_key = 'atelier_catalog_seed_lock';
     if (!add_option($lock_key, time(), '', false)) {
         $lock_time = (int)get_option($lock_key, 0);
@@ -45,17 +45,45 @@ add_action('init', function () {
     ];
     foreach ($products as [$name, $description, $price, $category, $material, $color, $photo]) {
         $sku = 'AT-' . strtoupper(substr(md5($name), 0, 6));
-        if (wc_get_product_id_by_sku($sku)) continue;
-        $product = new WC_Product_Simple();
-        $product->set_name($name); $product->set_status('publish'); $product->set_catalog_visibility('visible');
-        $product->set_description($description); $product->set_short_description('Thoughtfully made, ready for everyday.');
-        $product->set_regular_price((string)$price); $product->set_sku($sku);
-        $product->set_manage_stock(false); $product->set_stock_status('instock');
-        $id = $product->save();
+        $id = wc_get_product_id_by_sku($sku);
+        if (!$id) {
+            $product = new WC_Product_Simple();
+            $product->set_name($name); $product->set_status('publish'); $product->set_catalog_visibility('visible');
+            $product->set_description($description); $product->set_short_description('Thoughtfully made, ready for everyday.');
+            $product->set_regular_price((string)$price); $product->set_sku($sku);
+            $product->set_manage_stock(false); $product->set_stock_status('instock');
+            $id = $product->save();
+        }
+        if (!$id) continue;
+
         wp_set_object_terms($id, [$categories[$category]], 'product_cat');
         wp_set_object_terms($id, [sanitize_title($material)], 'pa_material');
         wp_set_object_terms($id, [sanitize_title($color)], 'pa_color');
         update_post_meta($id, '_atelier_photo', $photo);
+
+        $product = wc_get_product($id);
+        $product_attributes = [];
+        foreach ([
+            ['pa_material', $material],
+            ['pa_color', $color],
+        ] as $position => [$taxonomy, $term_name]) {
+            $term = get_term_by('slug', sanitize_title($term_name), $taxonomy);
+            $attribute_id = wc_attribute_taxonomy_id_by_name($taxonomy);
+            if (!$term || !$attribute_id) continue;
+
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_id($attribute_id);
+            $attribute->set_name($taxonomy);
+            $attribute->set_options([(int)$term->term_id]);
+            $attribute->set_position($position);
+            $attribute->set_visible(true);
+            $attribute->set_variation(false);
+            $product_attributes[] = $attribute;
+        }
+        if ($product && count($product_attributes) === 2) {
+            $product->set_attributes($product_attributes);
+            $product->save();
+        }
     }
     // Mark the catalog complete only when every expected SKU exists. This also
     // repairs a partially seeded catalog after interrupted deploys or imports.
@@ -63,13 +91,19 @@ add_action('init', function () {
         return 'AT-' . strtoupper(substr(md5($product[0]), 0, 6));
     }, $products);
     $catalog_complete = true;
+    $attributes_complete = true;
     foreach ($expected_skus as $expected_sku) {
-        if (!wc_get_product_id_by_sku($expected_sku)) {
+        $product_id = wc_get_product_id_by_sku($expected_sku);
+        if (!$product_id) {
             $catalog_complete = false;
-            break;
+            $attributes_complete = false;
+            continue;
         }
+        $product = wc_get_product($product_id);
+        if (!$product || !isset($product->get_attributes()['pa_color'], $product->get_attributes()['pa_material'])) $attributes_complete = false;
     }
     update_option('atelier_catalog_seeded', $catalog_complete ? 1 : 0);
+    update_option('atelier_catalog_attributes_seeded', $attributes_complete ? 1 : 0);
     } finally {
         delete_option($lock_key);
     }
