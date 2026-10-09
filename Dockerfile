@@ -6,6 +6,9 @@ RUN apt-get update \
     && docker-php-ext-install mysqli pdo_mysql \
     && a2enmod rewrite headers
 
+RUN curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp \
+    && chmod +x /usr/local/bin/wp
+
 RUN curl -fsSL https://downloads.wordpress.org/plugin/woocommerce.11.2.0.zip -o /tmp/woocommerce.zip \
     && unzip -q /tmp/woocommerce.zip -d /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/woocommerce.zip
