@@ -81,6 +81,21 @@ final class Atelier_State {
         }
         return self::$fetched;
     }
+    /**
+     * Initialize recovery only when the configured remote branch truly does
+     * not exist. An existing branch without a valid snapshot is corruption,
+     * not permission to replace remote state.
+     */
+    public static function initializeIfRemoteEmpty(): bool {
+        self::lock(); self::prepare();
+        $result = self::run(['git', 'ls-remote', '--heads', 'origin', 'refs/heads/' . self::branch()], null, self::dir() . '/repo');
+        if ($result !== '') return false;
+
+        // Confirm the remote repository is reachable and genuinely empty.
+        $all_heads = self::run(['git', 'ls-remote', '--heads', 'origin'], null, self::dir() . '/repo');
+        if ($all_heads !== '') return false;
+        return true;
+    }
     private static function mysqlOptions(): string {
         $values = [
             'host' => getenv('WORDPRESS_DB_HOST') ?: '127.0.0.1',
@@ -185,6 +200,12 @@ final class Atelier_State {
     }
     public static function sync(): void {
         self::lock(); self::prepare();
+        $branch_heads = self::git(['ls-remote', '--heads', 'origin', 'refs/heads/' . self::branch()]);
+        if ($branch_heads === '') {
+            $all_heads = self::git(['ls-remote', '--heads', 'origin']);
+            if ($all_heads === '') throw new RuntimeException('EMPTY_RECOVERY_REPOSITORY');
+            throw new RuntimeException('Recovery branch is missing while remote history exists.');
+        }
         $remote = self::remote();
         $applied = @file_get_contents(self::dir() . '/applied');
         $head = '';
@@ -202,8 +223,15 @@ final class Atelier_State {
     }
     public static function save(): void {
         self::lock(); self::prepare();
-        $head = self::git(['rev-parse', 'HEAD']);
-        if ($head !== self::remote()) throw new RuntimeException('A newer recovery snapshot exists. Retry the request.');
+        try { $head = self::git(['rev-parse', 'HEAD']); }
+        catch (RuntimeException $error) { $head = ''; }
+        if ($head === '') {
+            $branch_heads = self::git(['ls-remote', '--heads', 'origin', 'refs/heads/' . self::branch()]);
+            $all_heads = self::git(['ls-remote', '--heads', 'origin']);
+            if ($branch_heads !== '' || $all_heads !== '') throw new RuntimeException('Initial recovery save refused because remote history already exists.');
+        } elseif ($head !== self::remote()) {
+            throw new RuntimeException('A newer recovery snapshot exists. Retry the request.');
+        }
         $temporary = tempnam(self::dir(), 'dump-'); chmod($temporary, 0600);
         try {
             self::run(['mariadb-dump', '--defaults-extra-file=' . self::mysqlOptions(), '--single-transaction', '--skip-comments', '--hex-blob', '--result-file=' . $temporary, self::database()]);
@@ -215,20 +243,29 @@ final class Atelier_State {
             file_put_contents(self::dir() . '/repo/media.enc', $media, LOCK_EX);
             self::git(['add', 'state.enc', 'media.enc']);
             self::git(['commit', '-m', 'Save encrypted Atelier state ' . gmdate('Y-m-d H:i:s') . ' UTC']);
-            self::git(['fetch', '--deepen=10', 'origin', self::branch()]);
-            $depth = (int)self::git(['rev-list', '--count', 'FETCH_HEAD']);
-            if ($depth >= 10) {
-                $expected = self::remote();
-                self::git(['checkout', '--orphan', 'atelier-retention-' . gmdate('YmdHis')]);
-                self::git(['add', '-f', 'state.enc', 'media.enc']);
-                self::git(['commit', '-m', 'Encrypted Atelier recovery snapshot ' . gmdate('Y-m-d H:i:s') . ' UTC']);
-                self::git(['push', '--force-with-lease=refs/heads/' . self::branch() . ':' . $expected, 'origin', 'HEAD:' . self::branch()]);
-            } else {
+            $remote_branch = self::git(['ls-remote', '--heads', 'origin', 'refs/heads/' . self::branch()]);
+            if ($remote_branch === '') {
+                if (self::git(['ls-remote', '--heads', 'origin']) !== '') throw new RuntimeException('Recovery branch disappeared while other remote state exists.');
+                // First snapshot on a genuinely empty repository. A normal
+                // push refuses a concurrent/unrelated remote branch.
                 self::git(['push', 'origin', 'HEAD:' . self::branch()]);
+            } else {
+                self::git(['fetch', '--deepen=10', 'origin', self::branch()]);
+                $depth = (int)self::git(['rev-list', '--count', 'FETCH_HEAD']);
+                if ($depth >= 10) {
+                    $expected = self::remote();
+                    self::git(['checkout', '--orphan', 'atelier-retention-' . gmdate('YmdHis')]);
+                    self::git(['add', '-f', 'state.enc', 'media.enc']);
+                    self::git(['commit', '-m', 'Encrypted Atelier recovery snapshot ' . gmdate('Y-m-d H:i:s') . ' UTC']);
+                    self::git(['push', '--force-with-lease=refs/heads/' . self::branch() . ':' . $expected, 'origin', 'HEAD:' . self::branch()]);
+                } else {
+                    self::git(['push', 'origin', 'HEAD:' . self::branch()]);
+                }
             }
             $saved = self::git(['rev-parse', 'HEAD']);
             self::$fetched = $saved;
             file_put_contents(self::dir() . '/applied', $saved, LOCK_EX);
+            file_put_contents(self::dir() . '/initialized', '1', LOCK_EX);
             file_put_contents(self::dir() . '/status.json', json_encode(['saved_at' => gmdate('c'), 'database_bytes' => strlen($data), 'media_bytes' => strlen($media)]), LOCK_EX);
         } finally { @unlink($temporary); }
     }
@@ -240,7 +277,16 @@ final class Atelier_State {
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     try {
         if (!Atelier_State::enabled()) throw new RuntimeException('Recovery is not configured.');
-        if (($argv[1] ?? '') === 'restore') Atelier_State::sync();
+        if (($argv[1] ?? '') === 'restore') {
+            try { Atelier_State::sync(); }
+            catch (RuntimeException $error) {
+                if ($error->getMessage() === 'EMPTY_RECOVERY_REPOSITORY') exit(2);
+                throw $error;
+            }
+        }
+        elseif (($argv[1] ?? '') === 'remote-empty') {
+            if (!Atelier_State::initializeIfRemoteEmpty()) exit(2);
+        }
         elseif (($argv[1] ?? '') === 'save') Atelier_State::save();
         else throw new RuntimeException('Unknown recovery operation.');
         echo "Atelier recovery operation completed.\n";

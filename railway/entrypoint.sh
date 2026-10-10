@@ -38,7 +38,21 @@ fi
 unset db_password
 
 if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
-  php /usr/local/lib/atelier-state.php restore
+  if php /usr/local/lib/atelier-state.php restore; then
+    recovery_ready=1
+  else
+    restore_status=$?
+    if [[ "$restore_status" -eq 2 ]]; then
+      recovery_ready=0
+    else
+      echo 'Recovery restore failed; refusing to start without verified data.' >&2
+      exit 1
+    fi
+  fi
+  if [[ "$recovery_ready" -eq 0 ]] && [[ -f "$DATA_DIR/state/applied" ]]; then
+    echo 'A prior local recovery marker exists but the remote snapshot is missing; refusing bootstrap.' >&2
+    exit 1
+  fi
 fi
 
 mkdir -p /var/www/html/wp-content/uploads
@@ -93,6 +107,16 @@ EOF
       --admin_email="${ATELIER_ADMIN_EMAIL:-atelier-preview@example.com}" \
       --skip-email --prompt=admin_password "${wp_args[@]}" >/dev/null 2>&1; then
       echo 'WordPress installation failed during demo bootstrap.' >&2
+      exit 1
+    fi
+  fi
+
+  # Initialize recovery only on a genuinely empty remote repository. Any
+  # existing remote state or access/decryption error must be handled by the
+  # restore above, never by replacing it with this new installation.
+  if [[ -n "${ATELIER_STATE_REPO:-}" ]] && [[ "$recovery_ready" -eq 0 ]]; then
+    if ! php /usr/local/lib/atelier-state.php remote-empty; then
+      echo 'Recovery repository is not empty or could not be verified; refusing initial save.' >&2
       exit 1
     fi
   fi

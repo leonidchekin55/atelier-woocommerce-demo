@@ -14,7 +14,7 @@ Arbitrary uploaded files are **not** stored in the database snapshot. Keep a sep
 
 ## Write and restore protocol
 
-1. Startup fetches the private repository and authenticates/decrypts its latest snapshot before serving WordPress. Database and media archives use separate AES-256-GCM additional-authentication domains. Missing credentials, missing database snapshots or failed restore stop startup; there is no silent empty-shop fallback.
+1. Startup fetches the private repository and authenticates/decrypts its latest snapshot before serving WordPress. Database and media archives use separate AES-256-GCM additional-authentication domains. Missing credentials, missing database snapshots or failed restore stop startup; there is no silent empty-shop fallback. On the first-ever bootstrap only, the entrypoint may seed recovery after WordPress setup, and only after checking that the reachable private repository has no branches. A non-empty repository, a malformed snapshot, authentication failure or network error never permits an initial save over remote data.
 2. PHP requests share a lock. Before a POST, scheduled task or order cancellation, the latest remote snapshot is synchronized before WordPress loads. A stale instance cannot overwrite a newer remote commit.
 3. Checkout and contact/newsletter handlers save synchronously before acknowledging success. Orders and selected admin edits/deletions also trigger recovery saves. If a required save fails, checkout/forms return an error; visitors must retry.
 4. A SQL dump and a sorted, path-validated archive of uploads are compressed, authenticated and encrypted using AES-256-GCM with fresh nonces. Only `state.enc` and `media.enc` are committed. SQL temporary files are removed after export. Media restore rejects symbolic links, absolute paths, traversal, oversized archives, and oversized file counts; files are written atomically under the uploads directory.
@@ -34,7 +34,7 @@ Store these **only** in the hosting provider's secret environment settings:
 
 Never commit these values or put them in frontend JavaScript. Store a separate secure copy of the encryption key: a lost key makes recovery impossible. GitHub SSH host keys are pinned in `scripts/github-known-hosts`; update them from GitHub's official metadata when they rotate.
 
-The repository must already contain a compatible `state.enc` on branch `main`. Initialize it through an authenticated database export; a blank repository deliberately fails restore. `ATELIER_STATE_BRANCH` can select an isolated verification branch. Run `php /usr/local/lib/atelier-state.php restore` or `save` inside the configured container for recovery operations; do not run concurrent CLI operations while requests are being served.
+For an existing recovery setup, the configured branch must contain compatible `state.enc` and `media.enc` files. A brand-new, truly empty private repository is initialized automatically after the WordPress demo is provisioned; if any branch exists, the repository is treated as established and must restore successfully. `ATELIER_STATE_BRANCH` can select an isolated verification branch. Run `php /usr/local/lib/atelier-state.php restore` or `save` inside the configured container for recovery operations; do not run concurrent CLI operations while requests are being served.
 
 ## Limits and operating notes
 
