@@ -79,6 +79,8 @@ EOF
   wp plugin is-active woocommerce "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate woocommerce "${wp_args[@]}"
   wp theme is-active atelier-shop "${wp_args[@]}" >/dev/null 2>&1 || wp theme activate atelier-shop "${wp_args[@]}"
   wp eval 'do_action("init");' "${wp_args[@]}"
+  # WP-CLI runs as root; Apache must still be able to write into dated folders.
+  chown -R www-data:www-data "$DATA_DIR/uploads"
   echo 'Atelier demo bootstrap finished.'
 fi
 
