@@ -54,5 +54,6 @@ Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invali
 - WordPress sitemap queries exclude the WooCommerce cart, checkout and account pages, the unused sample page, and the default “Hello world” post.
 - The users sitemap provider is disabled, and author archives receive `noindex` while remaining crawlable so search engines can process the directive.
 - Local WordPress core query hooks returned only useful public pages and disabled the users provider. After Render deploy `a3f523f`, the sitemap index and child maps returned HTTP 200, listed 12 products and 3 product categories, and omitted cart, checkout, account, sample content, and the users sitemap. The public author archive returned HTTP 200 with `noindex`.
+- Anonymous REST requests for `/wp/v2/users` and individual users exposed the account slug. Public user endpoints are now removed for signed-out visitors, and author archive requests return HTTP 404. Authenticated WordPress users retain the REST user routes.
 
 The user-facing demo uses fictional sample data and no real payment gateway. The new uploaded-file persistence and history compaction are small-demo recovery features; they do not make Render Free a production database or promise immediate physical erasure of unreachable Git objects.

@@ -37,3 +37,22 @@ add_filter('wp_robots', function (array $robots): array {
     if (is_author()) $robots['noindex'] = true;
     return $robots;
 });
+
+add_filter('rest_endpoints', function (array $endpoints): array {
+    if (is_user_logged_in()) return $endpoints;
+
+    foreach (array_keys($endpoints) as $route) {
+        if (strpos($route, '/wp/v2/users') === 0) unset($endpoints[$route]);
+    }
+
+    return $endpoints;
+});
+
+add_action('template_redirect', function (): void {
+    if (!is_author()) return;
+
+    global $wp_query;
+    $wp_query->set_404();
+    status_header(404);
+    nocache_headers();
+}, 0);
