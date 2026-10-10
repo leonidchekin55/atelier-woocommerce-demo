@@ -13,6 +13,18 @@ RUN curl -fsSL https://downloads.wordpress.org/plugin/woocommerce.11.2.0.zip -o 
     && unzip -q /tmp/woocommerce.zip -d /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/woocommerce.zip
 
+# Bundle official Russian translations so the language switch works without
+# a runtime download or a database change to the store's default language.
+RUN set -eu; \
+    wp_version="$(php -r 'include "/usr/src/wordpress/wp-includes/version.php"; echo $wp_version;')"; \
+    core_url="$(curl -fsSL "https://api.wordpress.org/translations/core/1.0/?version=${wp_version}" | php -r '$d=json_decode(stream_get_contents(STDIN),true); foreach (($d["translations"] ?? []) as $t) if (($t["language"] ?? "") === "ru_RU") { echo $t["package"]; exit; } exit(1);')"; \
+    mkdir -p /usr/src/wordpress/wp-content/languages /usr/src/wordpress/wp-content/languages/plugins; \
+    curl -fsSL "$core_url" -o /tmp/core-ru.zip; \
+    unzip -jo /tmp/core-ru.zip '*.mo' -d /usr/src/wordpress/wp-content/languages >/dev/null; \
+    curl -fsSL https://downloads.wordpress.org/translation/plugin/woocommerce/11.2.0/ru_RU.zip -o /tmp/woocommerce-ru.zip; \
+    unzip -jo /tmp/woocommerce-ru.zip '*.mo' -d /usr/src/wordpress/wp-content/languages/plugins >/dev/null; \
+    rm /tmp/core-ru.zip /tmp/woocommerce-ru.zip
+
 COPY wp-content/themes/atelier-shop /usr/src/wordpress/wp-content/themes/atelier-shop
 COPY wp-content/mu-plugins /usr/src/wordpress/wp-content/mu-plugins
 COPY scripts/atelier-state.php scripts/atelier-request.php scripts/github-known-hosts /usr/local/lib/

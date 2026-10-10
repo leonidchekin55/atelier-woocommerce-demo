@@ -36,7 +36,7 @@ All brand names, products, prices and copy are fictional demo content. Replace t
 
 `Dockerfile` packages WordPress, WooCommerce, Atelier Shop, WP-CLI and MariaDB in one container. For the free Render preview, set `WORDPRESS_DB_PASSWORD` to a unique random value and set `ATELIER_ADMIN_USER`, `ATELIER_ADMIN_PASSWORD` (secret), and `ATELIER_SITE_URL`. On an empty database, the entrypoint installs WordPress, activates WooCommerce and Atelier Shop, and prepares the demo before Apache serves requests. Keep the admin password in Render's environment settings; never add it to this repository.
 
-Render Free has an ephemeral filesystem. The published demo additionally uses encrypted database snapshots in a separate private GitHub repository: orders, private messages and subscribers are restored after container replacement. Checkout/forms acknowledge only after a successful remote save. See [free recovery setup and limits](docs/persistence.md). Arbitrary uploaded files are not backed up; bundled demo photos are rebuilt. This is a low-traffic portfolio preview, not a production store.
+Render Free has an ephemeral filesystem. The published demo additionally uses encrypted database and media snapshots in a separate private GitHub repository: orders, private messages, subscribers and arbitrary uploads are restored after container replacement. Checkout/forms acknowledge only after a successful remote save. Media archives are capped at 20 MiB encrypted / 64 MiB expanded; reachable history compacts after ten saves. See [free recovery setup and limits](docs/persistence.md). English and Russian storefronts are included. This is a low-traffic portfolio preview, not a production store.
 
 ### Production checklist
 

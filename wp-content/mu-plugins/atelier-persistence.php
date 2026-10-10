@@ -49,6 +49,6 @@ add_action('shutdown', function () {
 add_action('wp_dashboard_setup', function () {
     wp_add_dashboard_widget('atelier_recovery', 'Atelier data recovery', function () {
         $status = Atelier_State::status();
-        echo '<p>Orders, inbox messages and subscribers are included in an encrypted remote recovery copy.</p><p>Last saved: <strong>' . esc_html($status['saved_at'] ?? 'Restored at startup; awaiting the next save') . '</strong>.</p><p>Uploaded files are not part of this database copy. Bundled demo photos are rebuilt automatically.</p>';
+        echo '<p>Orders, inbox messages, subscribers and uploaded files are included in encrypted remote recovery copies.</p><p>Last saved: <strong>' . esc_html($status['saved_at'] ?? 'Restored at startup; awaiting the next save') . '</strong>.</p><p>Recovery is limited to 20 MiB of encrypted media and 64 MiB expanded. Old Git history is compacted after ten snapshots.</p>';
     });
 });

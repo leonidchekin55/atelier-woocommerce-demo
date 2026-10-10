@@ -1,7 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.3.0');
+define('ATELIER_VERSION', '1.4.0');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/media.php';
