@@ -42,3 +42,6 @@ ENV WORDPRESS_DB_HOST=127.0.0.1 \
     WORDPRESS_CONFIG_EXTRA="define('DISALLOW_FILE_EDIT', true); define('WP_AUTO_UPDATE_CORE', 'minor');"
 
 ENTRYPOINT ["atelier-entrypoint"]
+
+# Google Search Console URL-prefix ownership verification file.
+COPY google796020b0a86d58e7.html /usr/src/wordpress/google796020b0a86d58e7.html
