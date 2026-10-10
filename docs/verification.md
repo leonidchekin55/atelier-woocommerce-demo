@@ -37,4 +37,10 @@ Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invali
 - A disposable local bare-Git simulation exercised the ten-snapshot threshold and force-with-lease compaction; the remote branch retained only the latest root snapshot.
 - The public portfolio homepage links the demo and current Google Drive résumé; Russian and English case pages return HTTP 200.
 
+## Search and social metadata — 2026-10-10
+
+- The local WordPress storefront returned non-empty page descriptions and Open Graph/Twitter metadata for English and Russian home pages, a product, a product category and a product search.
+- Product previews use that product's media-library image; catalog and search preview URLs resolve to the current archive/search URL rather than a product permalink.
+- The production Docker image built successfully and the updated PHP theme file passed `php -l`.
+
 The user-facing demo uses fictional sample data and no real payment gateway. The new uploaded-file persistence and history compaction are small-demo recovery features; they do not make Render Free a production database or promise immediate physical erasure of unreachable Git objects.
