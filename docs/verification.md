@@ -34,6 +34,7 @@ Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invali
 - Docker image builds with official Russian WordPress and WooCommerce translation packs. The PHP recovery helper and both mu-plugins pass `php -l` in the built image.
 - A local temporary WordPress/WooCommerce container confirmed the English default, the Russian language cookie and `lang="ru-RU"`, translated storefront text, Russian product/category/material names, and that switching back leaves English intact.
 - The media archive passed an authenticated encryption, compress/decompress, and file restore round trip. The published private recovery repository now contains `media.enc` alongside `state.enc`; uploaded media is encrypted before it leaves the container.
+- A disposable local bare-Git simulation exercised the ten-snapshot threshold and force-with-lease compaction; the remote branch retained only the latest root snapshot.
 - The public portfolio homepage links the demo and current Google Drive résumé; Russian and English case pages return HTTP 200.
 
 The user-facing demo uses fictional sample data and no real payment gateway. The new uploaded-file persistence and history compaction are small-demo recovery features; they do not make Render Free a production database or promise immediate physical erasure of unreachable Git objects.
