@@ -33,8 +33,21 @@ add_filter('wp_sitemaps_add_provider', function ($provider, string $name) {
     return $name === 'users' ? false : $provider;
 }, 10, 2);
 
+add_filter('wp_sitemaps_taxonomies_query_args', function (array $args, string $taxonomy): array {
+    if ($taxonomy !== 'category') return $args;
+
+    $default_category = get_term_by('slug', 'uncategorized', 'category');
+    if ($default_category instanceof WP_Term) {
+        $args['exclude'] = array_values(array_unique(array_merge(
+            isset($args['exclude']) ? (array) $args['exclude'] : [],
+            [$default_category->term_id]
+        )));
+    }
+    return $args;
+}, 10, 2);
+
 add_filter('wp_robots', function (array $robots): array {
-    if (is_author()) $robots['noindex'] = true;
+    if (is_author() || is_category('uncategorized')) $robots['noindex'] = true;
     return $robots;
 });
 

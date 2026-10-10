@@ -57,3 +57,5 @@ Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invali
 - Anonymous REST requests for `/wp/v2/users` and individual users exposed the account slug. Local WordPress confirms signed-out visitors no longer have user routes, while a logged-in administrator retains them. After Render deploy `1364d91`, collection/item REST requests and both author URL forms return HTTP 404 without the account slug; storefront home and shop remain HTTP 200.
 
 The user-facing demo uses fictional sample data and no real payment gateway. The new uploaded-file persistence and history compaction are small-demo recovery features; they do not make Render Free a production database or promise immediate physical erasure of unreachable Git objects.
+
+- Default WordPress `uncategorized` category is excluded from the taxonomy sitemap and its archive has `noindex`. Local WordPress hook checks confirm that existing exclusions are preserved and `product_cat` query arguments are unchanged; PHP lint passes. Local HTTP sitemap checking was unavailable (404).
