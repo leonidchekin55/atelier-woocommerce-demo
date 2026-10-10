@@ -1,0 +1,12 @@
+.consent-label{display:flex!important;align-items:flex-start;gap:9px;font-size:10px!important;color:var(--muted)}
+.consent-label input{width:auto!important;margin:3px 0 0;accent-color:var(--olive)}
+.form-feedback{padding:10px 12px;background:#eef1e9;color:var(--olive);font-size:11px}
+.form-error{background:#f6ece8;color:#9a4d38}
+.honeypot{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.newsletter form{display:grid;grid-template-columns:1fr auto;gap:9px;border:0}
+.newsletter input[type=email]{grid-column:1;grid-row:1;border-bottom:1px solid #aaa;padding:8px 0}
+.newsletter button{grid-column:2;grid-row:1;border-bottom:1px solid #aaa}
+.newsletter-consent{grid-column:1/-1;display:flex;align-items:flex-start;gap:7px;color:var(--muted);font-size:9px}
+.newsletter-consent input{flex:0 0 auto;width:auto;accent-color:var(--olive)}
+
+.atelier-filters input[type=search]{width:100%;min-width:0;border:1px solid var(--line);padding:9px;font-size:11px;background:#fff;color:var(--ink)}

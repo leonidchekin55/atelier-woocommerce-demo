@@ -1,8 +1,17 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-add_action('admin_init', function () {
-    if (!current_user_can('manage_woocommerce') || !class_exists('WooCommerce') || get_option('atelier_catalog_seeded')) return;
+add_action('init', function () {
+    if (!class_exists('WooCommerce') || (get_option('atelier_catalog_seeded') && get_option('atelier_catalog_attributes_seeded'))) return;
+    $lock_key = 'atelier_catalog_seed_lock';
+    if (!add_option($lock_key, time(), '', false)) {
+        $lock_time = (int)get_option($lock_key, 0);
+        if (!$lock_time || time() - $lock_time <= 300) return;
+        delete_option($lock_key);
+        if (!add_option($lock_key, time(), '', false)) return;
+    }
+
+    try {
     $attributes = ['color' => ['Color', ['Sand', 'Ivory', 'Olive', 'Terracotta']], 'material' => ['Material', ['Stoneware', 'Linen', 'Oak', 'Glass']]];
     foreach ($attributes as $slug => [$label, $terms]) {
         if (!taxonomy_exists('pa_' . $slug)) {
@@ -35,26 +44,75 @@ add_action('admin_init', function () {
         ['Evening glass pair', 'Two light, durable tumblers made for water, wine, or a small something after dinner.', 58, 'Objects', 'Glass', 'Ivory', 'photo-1572119865084-43c285814d63'],
     ];
     foreach ($products as [$name, $description, $price, $category, $material, $color, $photo]) {
-        $exists = get_posts(['post_type' => 'product', 'title' => $name, 'numberposts' => 1, 'fields' => 'ids']);
-        if ($exists) continue;
-        $product = new WC_Product_Simple();
-        $product->set_name($name); $product->set_status('publish'); $product->set_catalog_visibility('visible');
-        $product->set_description($description); $product->set_short_description('Thoughtfully made, ready for everyday.');
-        $product->set_regular_price((string)$price); $product->set_sku('AT-' . strtoupper(substr(md5($name), 0, 6)));
-        $product->set_manage_stock(false); $product->set_stock_status('instock');
-        $id = $product->save();
+        $sku = 'AT-' . strtoupper(substr(md5($name), 0, 6));
+        $id = wc_get_product_id_by_sku($sku);
+        if (!$id) {
+            $product = new WC_Product_Simple();
+            $product->set_name($name); $product->set_status('publish'); $product->set_catalog_visibility('visible');
+            $product->set_description($description); $product->set_short_description('Thoughtfully made, ready for everyday.');
+            $product->set_regular_price((string)$price); $product->set_sku($sku);
+            $product->set_manage_stock(false); $product->set_stock_status('instock');
+            $id = $product->save();
+        }
+        if (!$id) continue;
+
         wp_set_object_terms($id, [$categories[$category]], 'product_cat');
         wp_set_object_terms($id, [sanitize_title($material)], 'pa_material');
         wp_set_object_terms($id, [sanitize_title($color)], 'pa_color');
         update_post_meta($id, '_atelier_photo', $photo);
+
+        $product = wc_get_product($id);
+        $product_attributes = [];
+        foreach ([
+            ['pa_material', $material],
+            ['pa_color', $color],
+        ] as $position => [$taxonomy, $term_name]) {
+            $term = get_term_by('slug', sanitize_title($term_name), $taxonomy);
+            $attribute_id = wc_attribute_taxonomy_id_by_name($taxonomy);
+            if (!$term || !$attribute_id) continue;
+
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_id($attribute_id);
+            $attribute->set_name($taxonomy);
+            $attribute->set_options([(int)$term->term_id]);
+            $attribute->set_position($position);
+            $attribute->set_visible(true);
+            $attribute->set_variation(false);
+            $product_attributes[] = $attribute;
+        }
+        if ($product && count($product_attributes) === 2) {
+            $product->set_attributes($product_attributes);
+            $product->save();
+        }
     }
-    update_option('atelier_catalog_seeded', 1);
-});
+    // Mark the catalog complete only when every expected SKU exists. This also
+    // repairs a partially seeded catalog after interrupted deploys or imports.
+    $expected_skus = array_map(static function ($product) {
+        return 'AT-' . strtoupper(substr(md5($product[0]), 0, 6));
+    }, $products);
+    $catalog_complete = true;
+    $attributes_complete = true;
+    foreach ($expected_skus as $expected_sku) {
+        $product_id = wc_get_product_id_by_sku($expected_sku);
+        if (!$product_id) {
+            $catalog_complete = false;
+            $attributes_complete = false;
+            continue;
+        }
+        $product = wc_get_product($product_id);
+        if (!$product || !isset($product->get_attributes()['pa_color'], $product->get_attributes()['pa_material'])) $attributes_complete = false;
+    }
+    update_option('atelier_catalog_seeded', $catalog_complete ? 1 : 0);
+    update_option('atelier_catalog_attributes_seeded', $attributes_complete ? 1 : 0);
+    } finally {
+        delete_option($lock_key);
+    }
+}, 99);
 
 add_filter('woocommerce_product_get_image', function ($html, $product, $size, $attr, $placeholder, $image) {
     $photo = get_post_meta($product->get_id(), '_atelier_photo', true);
     if (!$photo || $product->get_image_id()) return $html;
-    $url = 'https://images.unsplash.com/' . rawurlencode($photo) . '?auto=format&fit=crop&w=900&q=82';
+    $url = get_template_directory_uri() . '/assets/images/' . rawurlencode($photo) . '.webp';
     $alt = esc_attr($product->get_name());
     return '<img src="' . esc_url($url) . '" alt="' . $alt . '" loading="lazy" decoding="async">';
 }, 10, 6);

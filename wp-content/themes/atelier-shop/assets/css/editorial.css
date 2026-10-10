@@ -1,0 +1,4 @@
+.journal-read-more{margin-top:10px}
+.journal-read-more>summary{display:inline-block;list-style:none;cursor:pointer}
+.journal-read-more>summary::-webkit-details-marker{display:none}
+.journal-read-more>div{padding-top:8px;color:var(--muted);font-size:12px}

@@ -12,7 +12,7 @@ docker compose up -d
 
 On a fresh clone, open <http://localhost:8080>, complete the WordPress installer, then install and activate **WooCommerce** (the official plugin) in **Plugins → Add New Plugin** and activate **Atelier Shop** in **Appearance → Themes**. On first theme activation the demo creates its pages, product catalog and product attributes. Its local Apache configuration supports normal WordPress permalinks.
 
-The already initialized local instance uses `atelier_admin` as its administrator; its password was created for this local demo and provided in the handoff chat. Change it in **Users → Profile** if you keep using this instance. WooCommerce is active, sample products are loaded, store visibility is enabled, and offline **Cash on delivery** is enabled for test orders. No real payment provider is configured. Set currency, country, shipping and tax in WooCommerce settings to match your demo scenario.
+The already initialized local instance uses `atelier_admin` as its administrator; its local-only password was provided in the handoff chat. Change it in **Users → Profile** if you keep using this instance. WooCommerce is active, sample products are loaded, store visibility is enabled, and offline **Cash on delivery** is enabled for test orders. No real payment provider is configured. The demo shipping zone accepts US addresses at $8 standard delivery, with free delivery above $150. These are sample terms; no orders are fulfilled.
 
 The built-in catalog seed runs once and adds 12 fictional homeware products with prices, categories, colors and materials. WooCommerce handles category browsing, search, sorting, pagination, product detail, cart, checkout and account. Shop filters are provided by the theme for category, price, color and material. The checkout creates an order in WooCommerce; keep payments in an offline/test mode.
 
@@ -21,18 +21,30 @@ To stop: `docker compose down`. To erase the local database and uploads as well:
 ## What is included
 
 - Custom WordPress theme with editorial home page, shop, about, journal, contact and FAQ pages.
-- WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling.
-- One-time sample catalog provisioning and sensible WooCommerce defaults.
+- WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling. Demo photographs are imported into the WordPress media library and used by native WooCommerce galleries and Store API.
+- Mobile cart rows, full-width checkout fields, a skip link, visible keyboard focus, modal filter focus handling, and reduced-motion support. Free shipping is selected automatically for eligible orders.
+- Page-specific search descriptions and Open Graph/Twitter previews, crawlable English/Russian URLs with canonical and `hreflang` links, and a clean sitemap. Anonymous visitors cannot enumerate WordPress user profiles through REST or author archives.
+- One-time sample catalog and demo checkout provisioning, including US shipping methods.
+- Private WordPress inbox and newsletter list with consent, nonce checks and spam honeypot fields. Form submissions are stored in wp-admin; this demo does not send email.
+- Product and editorial photos are bundled as optimized WebP assets under the [Unsplash License](https://unsplash.com/license). DM Sans and Playfair Display are self-hosted, with their SIL Open Font License texts included in `assets/fonts`.
 - Docker Compose with MariaDB and persistent local volumes.
 
 All brand names, products, prices and copy are fictional demo content. Replace them before any public launch.
 
 ## Deployment outline
 
-1. Provision a host with current PHP supported by WordPress, MySQL/MariaDB, HTTPS and persistent media storage (or use a managed WordPress host).
-2. Install WordPress and WooCommerce. Upload `wp-content/themes/atelier-shop` and activate Atelier Shop.
-3. Add real products and product attributes in WooCommerce; replace demo copy and imagery, configure shipping/tax, privacy and legal pages.
-4. Configure a payment provider in its sandbox first, test orders/refunds/webhooks, then switch to live credentials only when ready.
-5. Enable HTTPS, backups, updates and production caching. Do not deploy the Docker sample database credentials to a public server.
+### Render free preview
 
-This workspace contains a local demo source project. It has not been published to a public host or pushed to GitHub.
+`Dockerfile` packages WordPress, WooCommerce, Atelier Shop, WP-CLI and MariaDB in one container. For the free Render preview, set `WORDPRESS_DB_PASSWORD` to a unique random value and set `ATELIER_ADMIN_USER`, `ATELIER_ADMIN_PASSWORD` (secret), and `ATELIER_SITE_URL`. On an empty database, the entrypoint installs WordPress, activates WooCommerce and Atelier Shop, and prepares the demo before Apache serves requests. Keep the admin password in Render's environment settings; never add it to this repository.
+
+Render Free has an ephemeral filesystem. The published demo additionally uses encrypted database and media snapshots in a separate private GitHub repository: orders, private messages, subscribers and arbitrary uploads are restored after container replacement. Checkout/forms acknowledge only after a successful remote save. Media archives are capped at 20 MiB encrypted / 64 MiB expanded; reachable history compacts after ten saves. See [free recovery setup and limits](docs/persistence.md). English and Russian storefronts are included. This is a low-traffic portfolio preview, not a production store.
+
+### Production checklist
+
+1. Provision a host with current PHP supported by WordPress, MySQL/MariaDB, HTTPS and persistent media storage (or use managed WordPress hosting).
+2. Install WordPress and WooCommerce. Upload `wp-content/themes/atelier-shop` and activate Atelier Shop.
+3. Add real products and attributes; replace demo copy and imagery; configure shipping/tax, privacy and legal pages.
+4. Configure a payment provider in sandbox mode first, test orders/refunds/webhooks, then switch to live credentials only when ready.
+5. Enable HTTPS, backups, updates and production caching. Never deploy the Docker sample database credentials to a public server.
+
+Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. Public Render preview: <https://atelier-woocommerce-demo.onrender.com>. The Render Free preview uses database recovery snapshots and is not a production store.
