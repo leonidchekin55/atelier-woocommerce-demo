@@ -18,7 +18,28 @@ for attempt in $(seq 1 60); do
 done
 mariadb-admin --socket=/run/mysqld/mysqld.sock ping >/dev/null
 
-mariadb --socket=/run/mysqld/mysqld.sock -e "CREATE DATABASE IF NOT EXISTS \`$WORDPRESS_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS '$WORDPRESS_DB_USER'@'127.0.0.1' IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'; GRANT ALL PRIVILEGES ON \`$WORDPRESS_DB_NAME\`.* TO '$WORDPRESS_DB_USER'@'127.0.0.1'; FLUSH PRIVILEGES;"
+# Validate identifiers and pass the password through stdin, never process arguments.
+if [[ ! "$WORDPRESS_DB_NAME" =~ ^[a-zA-Z0-9_]+$ || ! "$WORDPRESS_DB_USER" =~ ^[a-zA-Z0-9_]+$ ]]; then
+  echo 'Invalid database identifiers.' >&2
+  exit 1
+fi
+db_password="${WORDPRESS_DB_PASSWORD//\\/\\\\}"
+db_password="${db_password//\'/\'\'}"
+if ! mariadb --socket=/run/mysqld/mysqld.sock >/dev/null 2>&1 <<SQL
+CREATE DATABASE IF NOT EXISTS \`$WORDPRESS_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$WORDPRESS_DB_USER'@'127.0.0.1' IDENTIFIED BY '$db_password';
+GRANT ALL PRIVILEGES ON \`$WORDPRESS_DB_NAME\`.* TO '$WORDPRESS_DB_USER'@'127.0.0.1';
+FLUSH PRIVILEGES;
+SQL
+then
+  echo 'Database provisioning failed.' >&2
+  exit 1
+fi
+unset db_password
+
+if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
+  php /usr/local/lib/atelier-state.php restore
+fi
 
 mkdir -p /var/www/html/wp-content/uploads
 if [ -d /var/www/html/wp-content/uploads ] && [ ! -L /var/www/html/wp-content/uploads ]; then
@@ -76,11 +97,21 @@ EOF
     fi
   fi
 
+  wp eval 'update_option("active_plugins", array_values(array_filter((array)get_option("active_plugins"), function ($plugin) { return !preg_match("~^atelier-(export|bridge|hold)-plugin/~", $plugin); })));' "${wp_args[@]}" >/dev/null
   wp plugin is-active woocommerce "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate woocommerce "${wp_args[@]}"
   wp theme is-active atelier-shop "${wp_args[@]}" >/dev/null 2>&1 || wp theme activate atelier-shop "${wp_args[@]}"
+  wp option update home "$site_url" "${wp_args[@]}" >/dev/null
+  wp option update siteurl "$site_url" "${wp_args[@]}" >/dev/null
+  if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
+    wp option delete atelier_product_media_seeded "${wp_args[@]}" >/dev/null 2>&1 || true
+  fi
   wp eval 'do_action("init");' "${wp_args[@]}"
+  if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
+    php /usr/local/lib/atelier-state.php save
+  fi
   # WP-CLI runs as root; Apache must still be able to write into dated folders.
   chown -R www-data:www-data "$DATA_DIR/uploads"
+  chown -R www-data:www-data "$DATA_DIR/state" 2>/dev/null || true
   echo 'Atelier demo bootstrap finished.'
 fi
 

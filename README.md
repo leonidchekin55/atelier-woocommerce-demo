@@ -36,7 +36,7 @@ All brand names, products, prices and copy are fictional demo content. Replace t
 
 `Dockerfile` packages WordPress, WooCommerce, Atelier Shop, WP-CLI and MariaDB in one container. For the free Render preview, set `WORDPRESS_DB_PASSWORD` to a unique random value and set `ATELIER_ADMIN_USER`, `ATELIER_ADMIN_PASSWORD` (secret), and `ATELIER_SITE_URL`. On an empty database, the entrypoint installs WordPress, activates WooCommerce and Atelier Shop, and prepares the demo before Apache serves requests. Keep the admin password in Render's environment settings; never add it to this repository.
 
-Render Free has an ephemeral filesystem, so database and uploaded files are lost after restarts, spin-downs or redeploys. The bootstrap recreates the fictional shop and its sample catalog automatically, but demo orders and dashboard entries do not persist. Use this only as a portfolio preview, never for a real store. For durable data, use a host with persistent storage and backups.
+Render Free has an ephemeral filesystem. The published demo additionally uses encrypted database snapshots in a separate private GitHub repository: orders, private messages and subscribers are restored after container replacement. Checkout/forms acknowledge only after a successful remote save. See [free recovery setup and limits](docs/persistence.md). Arbitrary uploaded files are not backed up; bundled demo photos are rebuilt. This is a low-traffic portfolio preview, not a production store.
 
 ### Production checklist
 
@@ -46,4 +46,4 @@ Render Free has an ephemeral filesystem, so database and uploaded files are lost
 4. Configure a payment provider in sandbox mode first, test orders/refunds/webhooks, then switch to live credentials only when ready.
 5. Enable HTTPS, backups, updates and production caching. Never deploy the Docker sample database credentials to a public server.
 
-Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. Public Render preview: <https://atelier-woocommerce-demo.onrender.com>. The Render Free preview is disposable and not a production store.
+Source repository: <https://github.com/leonidchekin55/atelier-woocommerce-demo>. Public Render preview: <https://atelier-woocommerce-demo.onrender.com>. The Render Free preview uses database recovery snapshots and is not a production store.

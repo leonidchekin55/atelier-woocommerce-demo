@@ -12,3 +12,17 @@ Verified locally on 2026-10-10 using Chromium with real WordPress and WooCommerc
 - Changed PHP files, JavaScript and the startup shell script pass syntax checks.
 
 Render Free rebuilds the demo catalog and media library after losing its filesystem. Test orders, messages, subscribers and manual dashboard changes are disposable. The images are illustrative demo photography; a real store needs photographs of its actual products.
+
+
+## Durable demo recovery — 2026-10-10
+
+Verified in a fresh Docker container against an isolated private recovery branch:
+
+- Existing public order 37, contact 38 and subscriber 39 restored from the migration snapshot.
+- Created test COD order 44 ($188, $0 shipping, processing) and private contact 45 through the browser; newsletter duplicate handling passed.
+- Deleted the entire container and its ephemeral database, then created a new container without volumes. Orders 37/44, messages 38/45 and subscriber 39 returned with identical IDs/statuses/totals; all product image files were rebuilt (zero missing).
+- An unavailable recovery branch caused contact POST to return 503 before a success acknowledgement; no extra contact was stored.
+- Authenticated encryption roundtrip and modified ciphertext rejection passed.
+- Search plus material filter, malformed nested filter arguments, PHP syntax, shell syntax and whitespace checks passed. Catalog pagination shows nine products per first page.
+
+See `persistence.md` for capacity, media and low-traffic limitations. Local browser scripts use fictional test data; no real payments or email deliveries were performed.

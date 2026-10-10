@@ -8,3 +8,5 @@
 .newsletter button{grid-column:2;grid-row:1;border-bottom:1px solid #aaa}
 .newsletter-consent{grid-column:1/-1;display:flex;align-items:flex-start;gap:7px;color:var(--muted);font-size:9px}
 .newsletter-consent input{flex:0 0 auto;width:auto;accent-color:var(--olive)}
+
+.atelier-filters input[type=search]{width:100%;min-width:0;border:1px solid var(--line);padding:9px;font-size:11px;background:#fff;color:var(--ink)}

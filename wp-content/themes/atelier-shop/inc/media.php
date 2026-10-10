@@ -20,7 +20,18 @@ add_action('init', function () {
             $photo = get_post_meta($product->get_id(), '_atelier_photo', true);
             if (!$photo) continue;
             $demo_count++;
-            if ($product->get_image_id()) continue;
+            if ($product->get_image_id()) {
+                $attachment_id = $product->get_image_id();
+                $destination = get_attached_file($attachment_id);
+                if (is_file($destination)) continue;
+                $source = get_template_directory() . '/assets/images/' . sanitize_file_name($photo) . '.webp';
+                if (!$destination || !is_file($source) || !wp_mkdir_p(dirname($destination)) || !copy($source, $destination)) {
+                    $complete = false;
+                    continue;
+                }
+                wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $destination));
+                continue;
+            }
 
             $attachments = get_posts([
                 'post_type' => 'attachment', 'post_status' => 'inherit',

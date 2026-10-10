@@ -47,6 +47,10 @@ function atelier_handle_contact() {
     ], true);
     if (is_wp_error($id)) atelier_form_redirect('atelier_contact', 'error', '/contact/');
     update_post_meta($id, '_atelier_email', $email);
+    if (function_exists('atelier_persist_now') && is_wp_error(atelier_persist_now())) {
+        wp_delete_post($id, true);
+        atelier_form_redirect('atelier_contact', 'error', '/contact/');
+    }
     atelier_form_redirect('atelier_contact', 'sent', '/contact/');
 }
 
@@ -71,6 +75,7 @@ function atelier_handle_newsletter() {
         if (is_wp_error($id)) atelier_form_redirect('atelier_newsletter', 'error', '/');
         update_post_meta($id, '_atelier_email', $email);
     }
+    if (function_exists('atelier_persist_now') && is_wp_error(atelier_persist_now())) atelier_form_redirect('atelier_newsletter', 'error', '/');
     atelier_form_redirect('atelier_newsletter', 'stored', '/');
 }
 
