@@ -75,3 +75,11 @@ add_action('init', function () {
 }, 30);
 
 add_filter('woocommerce_enqueue_styles', '__return_empty_array');
+
+// The advertised free-delivery threshold should not leave a paid rate selected.
+add_filter('woocommerce_package_rates', function ($rates) {
+    $free_rates = array_filter($rates, static function ($rate) {
+        return $rate->get_method_id() === 'free_shipping';
+    });
+    return $free_rates ?: $rates;
+}, 100);

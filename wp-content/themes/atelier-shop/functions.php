@@ -1,9 +1,10 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.1.0');
+define('ATELIER_VERSION', '1.2.0');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
+require_once get_template_directory() . '/inc/media.php';
 require_once get_template_directory() . '/inc/filters.php';
 require_once get_template_directory() . '/inc/forms.php';
 
@@ -13,6 +14,7 @@ add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('atelier-main', get_template_directory_uri() . '/assets/css/main.css', ['atelier-style'], ATELIER_VERSION);
     wp_enqueue_style('atelier-editorial', get_template_directory_uri() . '/assets/css/editorial.css', ['atelier-main'], ATELIER_VERSION);
     wp_enqueue_style('atelier-forms', get_template_directory_uri() . '/assets/css/forms.css', ['atelier-editorial'], ATELIER_VERSION);
+    wp_enqueue_style('atelier-commerce', get_template_directory_uri() . '/assets/css/commerce.css', ['atelier-forms'], ATELIER_VERSION);
     wp_enqueue_script('atelier-main', get_template_directory_uri() . '/assets/js/main.js', [], ATELIER_VERSION, true);
 });
 

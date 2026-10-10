@@ -11,6 +11,7 @@ if [ ! -d "$DATA_DIR/mysql/mysql" ]; then
 fi
 
 mysqld --user=mysql --datadir="$DATA_DIR/mysql" --socket=/run/mysqld/mysqld.sock --bind-address=127.0.0.1 --port=3306 &
+mysql_pid=$!
 for attempt in $(seq 1 60); do
   if mariadb-admin --socket=/run/mysqld/mysqld.sock ping >/dev/null 2>&1; then break; fi
   sleep 1
@@ -54,7 +55,7 @@ EOF
       database_ready=1
       break
     fi
-    kill -0 "$apache_pid" 2>/dev/null || exit 1
+    kill -0 "$mysql_pid" 2>/dev/null || exit 1
     sleep 1
   done
 

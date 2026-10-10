@@ -21,7 +21,8 @@ To stop: `docker compose down`. To erase the local database and uploads as well:
 ## What is included
 
 - Custom WordPress theme with editorial home page, shop, about, journal, contact and FAQ pages.
-- WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling.
+- WooCommerce product templates, responsive archive and product details, filter sidebar/drawer, cart and checkout styling. Demo photographs are imported into the WordPress media library and used by native WooCommerce galleries and Store API.
+- Mobile cart rows, full-width checkout fields, a skip link, visible keyboard focus, modal filter focus handling, and reduced-motion support. Free shipping is selected automatically for eligible orders.
 - One-time sample catalog and demo checkout provisioning, including US shipping methods.
 - Private WordPress inbox and newsletter list with consent, nonce checks and spam honeypot fields. Form submissions are stored in wp-admin; this demo does not send email.
 - Product and editorial photos are bundled as optimized WebP assets under the [Unsplash License](https://unsplash.com/license). DM Sans and Playfair Display are self-hosted, with their SIL Open Font License texts included in `assets/fonts`.
