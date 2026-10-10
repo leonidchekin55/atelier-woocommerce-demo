@@ -26,3 +26,5 @@ Verified in a fresh Docker container against an isolated private recovery branch
 - Search plus material filter, malformed nested filter arguments, PHP syntax, shell syntax and whitespace checks passed. Catalog pagination shows nine products per first page.
 
 See `persistence.md` for capacity, media and low-traffic limitations. Local browser scripts use fictional test data; no real payments or email deliveries were performed.
+
+Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invalid checkout rejection, test COD order 44 ($188 with free shipping), contact submission and JavaScript-error checks. A missing custom attachment was verified locally to remain untouched by demo-photo reconstruction.

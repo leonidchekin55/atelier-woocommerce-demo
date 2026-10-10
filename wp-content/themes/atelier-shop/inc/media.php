@@ -24,6 +24,11 @@ add_action('init', function () {
                 $attachment_id = $product->get_image_id();
                 $destination = get_attached_file($attachment_id);
                 if (is_file($destination)) continue;
+                // A user replacement is not a bundled demo image; never overwrite it.
+                if (get_post_meta($attachment_id, '_atelier_photo', true) !== $photo) {
+                    $complete = false;
+                    continue;
+                }
                 $source = get_template_directory() . '/assets/images/' . sanitize_file_name($photo) . '.webp';
                 if (!$destination || !is_file($source) || !wp_mkdir_p(dirname($destination)) || !copy($source, $destination)) {
                     $complete = false;
