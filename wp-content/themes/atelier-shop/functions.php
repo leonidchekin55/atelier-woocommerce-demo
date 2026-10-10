@@ -75,6 +75,8 @@ add_filter('get_canonical_url', function ($url) {
 add_action('wp_head', function () {
     if (is_admin() || is_feed() || is_embed()) return;
 
+    echo '<meta name="google-site-verification" content="8rv9o11ZOkUG51YwiTQ2jvBnVUAd4H8wSRHlqW1_f64">' . "\n";
+
     $is_product = function_exists('is_product') && is_product();
     $language = function_exists('atelier_language') ? atelier_language() : 'en';
     $title = wp_get_document_title();
