@@ -217,7 +217,7 @@ final class Atelier_State {
             self::git(['commit', '-m', 'Save encrypted Atelier state ' . gmdate('Y-m-d H:i:s') . ' UTC']);
             self::git(['fetch', '--deepen=10', 'origin', self::branch()]);
             $depth = (int)self::git(['rev-list', '--count', 'FETCH_HEAD']);
-            if ($depth >= 11) {
+            if ($depth >= 10) {
                 $expected = self::remote();
                 self::git(['checkout', '--orphan', 'atelier-retention-' . gmdate('YmdHis')]);
                 self::git(['add', '-f', 'state.enc', 'media.enc']);

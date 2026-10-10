@@ -86,6 +86,21 @@ function atelier_translate_storefront(string $html): string {
         'Monday–Friday' => 'Понедельник–пятница', '10 am–5 pm (local time)' => '10:00–17:00 (местное время)', 'Explore' => 'Магазин', 'Help' => 'Помощь',
         'Shop all' => 'Весь каталог', 'Objects made to be lived with.<br>Considered materials, enduring forms.' => 'Вещи для жизни.<br>Натуральные материалы и простые формы.',
         'Manage entries in the private WordPress dashboard.' => 'Список подписчиков доступен в закрытой панели WordPress.', 'Save my email to the demo list; no emails are sent.' => 'Сохранить адрес в тестовом списке; письма не отправляются.',
+        'Sunday stoneware bowl' => 'Каменная миска «Воскресенье»', 'A softly rounded everyday bowl, thrown and glazed by hand. The natural variation in each surface makes every piece its own.' => 'Миска мягкой округлой формы на каждый день, выточенная и глазурованная вручную. Естественные оттенки делают каждую вещь неповторимой.',
+        'Ripple serving platter' => 'Блюдо для подачи «Волна»', 'A generous platter with a gently waved edge. Made for shared lunches and long evenings around the table.' => 'Вместительное блюдо с мягко волнистым краем для обедов в компании и долгих вечеров за столом.',
+        'Everyday espresso cup' => 'Чашка для эспрессо «На каждый день»', 'A small, balanced cup with a thumb-friendly handle and satin glaze. Holds approximately 90 ml.' => 'Небольшая чашка с удобной ручкой и сатиновой глазурью. Объём около 90 мл.',
+        'Gathering pitcher' => 'Кувшин «Собраться вместе»', 'A sculptural pitcher that pours cleanly and looks at home on the table between uses.' => 'Выразительный кувшин, из которого удобно наливать и который украшает стол даже без дела.',
+        'Washed linen napkin set' => 'Набор льняных салфеток', 'Set of two relaxed linen napkins, pre-washed for a soft hand. Woven from European flax.' => 'Две мягкие льняные салфетки из европейского льна, предварительно выстиранные для мягкости.',
+        'Linen table runner' => 'Льняная дорожка на стол', 'A long, softly draping runner with a fine hem. Naturally textured and easy to care for.' => 'Длинная дорожка с тонкой обработкой края. Натуральная фактура и простой уход.',
+        'Quiet hour cushion cover' => 'Чехол на подушку «Тихий час»', 'A tactile cover in heavyweight washed linen, finished with a discreet hidden fastening.' => 'Фактурный чехол из плотного выстиранного льна с потайной застёжкой.',
+        'Dawn throw' => 'Плед «Рассвет»', 'A light layer for cool mornings, woven from a breathable natural blend with a simple selvedge edge.' => 'Лёгкий плед для прохладного утра из дышащей натуральной ткани с аккуратной кромкой.',
+        'Low oak candleholder' => 'Низкий подсвечник из дуба', 'Turned from solid oak with a considered, low profile. Designed for standard taper candles.' => 'Выточен из массива дуба и рассчитан на стандартные конические свечи.',
+        'Handblown bud vase' => 'Ваза для одного цветка ручной выдувки', 'A small handblown glass vessel with a softly weighted base. Each one carries subtle bubbles and variation.' => 'Небольшая стеклянная ваза с устойчивым дном. В каждой остаются лёгкие пузырьки и оттенки ручной работы.',
+        'Arc oak tray' => 'Дубовый поднос «Дуга»', 'A useful catch-all with a shallow carved edge. Finished by hand with a food-safe oil.' => 'Практичный поднос с неглубоким резным краем, вручную покрытый безопасным для еды маслом.',
+        'Evening glass pair' => 'Пара стаканов «Вечер»', 'Two light, durable tumblers made for water, wine, or a small something after dinner.' => 'Два лёгких прочных стакана для воды, вина или вечернего напитка.',
+        'Thoughtfully made, ready for everyday.' => 'Продумано и создано для повседневной жизни.', 'Ceramics' => 'Керамика', 'Textiles' => 'Текстиль', 'Objects' => 'Предметы для дома',
+        'Sand' => 'Песочный', 'Ivory' => 'Слоновая кость', 'Olive' => 'Оливковый', 'Terracotta' => 'Терракотовый',
+        'Stoneware' => 'Каменная керамика', 'Linen' => 'Лён', 'Oak' => 'Дуб', 'Glass' => 'Стекло',
     ];
     return strtr($html, $copy);
 }
