@@ -1,7 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.5.0');
+define('ATELIER_VERSION', '1.6.0');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/media.php';
@@ -51,24 +51,38 @@ function atelier_seo_description(): string {
     return wp_html_excerpt($description, 160, '…');
 }
 
+function atelier_seo_base_url(): string {
+    if (is_singular()) return get_permalink(get_queried_object_id());
+    if (is_search()) return get_search_link();
+    if (function_exists('is_shop') && is_shop()) return wc_get_page_permalink('shop');
+    if ((function_exists('is_product_category') && is_product_category()) || (function_exists('is_product_tag') && is_product_tag())) {
+        $url = get_term_link(get_queried_object());
+        return is_wp_error($url) ? home_url('/') : $url;
+    }
+    return home_url('/');
+}
+
+function atelier_seo_language_url(string $url, string $language): string {
+    $url = remove_query_arg('atelier_lang', $url);
+    return $language === 'ru' ? add_query_arg('atelier_lang', 'ru', $url) : $url;
+}
+
+add_filter('get_canonical_url', function ($url) {
+    if (!$url || is_admin() || !function_exists('atelier_language')) return $url;
+    return atelier_seo_language_url($url, atelier_language());
+});
+
 add_action('wp_head', function () {
     if (is_admin() || is_feed() || is_embed()) return;
 
     $is_product = function_exists('is_product') && is_product();
+    $language = function_exists('atelier_language') ? atelier_language() : 'en';
     $title = wp_get_document_title();
     $description = atelier_seo_description();
-    if (is_singular()) {
-        $url = wp_get_canonical_url() ?: get_permalink(get_queried_object_id());
-    } elseif (is_search()) {
-        $url = get_search_link();
-    } elseif (function_exists('is_shop') && is_shop()) {
-        $url = wc_get_page_permalink('shop');
-    } elseif ((function_exists('is_product_category') && is_product_category()) || (function_exists('is_product_tag') && is_product_tag())) {
-        $term_url = get_term_link(get_queried_object());
-        $url = is_wp_error($term_url) ? home_url('/') : $term_url;
-    } else {
-        $url = home_url('/');
-    }
+    $base_url = atelier_seo_base_url();
+    $url = atelier_seo_language_url($base_url, $language);
+    $english_url = atelier_seo_language_url($base_url, 'en');
+    $russian_url = atelier_seo_language_url($base_url, 'ru');
     $image = '';
 
     if ($is_product) {
@@ -78,7 +92,12 @@ add_action('wp_head', function () {
     if (!$image) $image = get_template_directory_uri() . '/assets/images/photo-1616486338812-3dadae4b4ace-wide.webp';
 
     echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
+    if (!is_singular() || !wp_get_canonical_url()) echo '<link rel="canonical" href="' . esc_url($url) . '">' . "\n";
+    echo '<link rel="alternate" hreflang="en-US" href="' . esc_url($english_url) . '">' . "\n";
+    echo '<link rel="alternate" hreflang="ru-RU" href="' . esc_url($russian_url) . '">' . "\n";
+    echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url) . '">' . "\n";
     echo '<meta property="og:type" content="' . ($is_product ? 'product' : 'website') . '">' . "\n";
+    echo '<meta property="og:locale" content="' . ($language === 'ru' ? 'ru_RU' : 'en_US') . '">' . "\n";
     echo '<meta property="og:site_name" content="' . esc_attr(get_bloginfo('name')) . '">' . "\n";
     echo '<meta property="og:title" content="' . esc_attr($title) . '">' . "\n";
     echo '<meta property="og:description" content="' . esc_attr($description) . '">' . "\n";

@@ -43,4 +43,10 @@ Public version 1.3.0 also passed 320/390/1440 layouts, keyboard controls, invali
 - Product previews use that product's media-library image; catalog and search preview URLs resolve to the current archive/search URL rather than a product permalink.
 - The production Docker image built successfully and the updated PHP theme file passed `php -l`.
 
+## Language-specific crawl URLs — 2026-10-10
+
+- Explicit `?atelier_lang=ru` and `?atelier_lang=en` requests return HTTP 200 without redirecting and set the language cookie. Subsequent product and category navigation preserves the selected language.
+- Home, product, category and search responses each emit one canonical URL and three reciprocal `hreflang` links (`en-US`, `ru-RU`, `x-default`). Russian canonicals retain `?atelier_lang=ru`; English canonicals use the clean URL.
+- Local checks confirmed the HTML language attribute, language-switch target, localized metadata and URLs in both language modes. Search Console indexing was not available to verify.
+
 The user-facing demo uses fictional sample data and no real payment gateway. The new uploaded-file persistence and history compaction are small-demo recovery features; they do not make Render Free a production database or promise immediate physical erasure of unreachable Git objects.

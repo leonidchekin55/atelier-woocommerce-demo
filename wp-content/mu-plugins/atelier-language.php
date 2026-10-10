@@ -19,8 +19,6 @@ add_action('init', function () {
     $value = sanitize_key(wp_unslash($_GET['atelier_lang']));
     setcookie('atelier_lang', $value, ['expires' => time() + YEAR_IN_SECONDS, 'path' => COOKIEPATH ?: '/', 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Lax']);
     $_COOKIE['atelier_lang'] = $value;
-    wp_safe_redirect(remove_query_arg('atelier_lang'), 302, 'Atelier language');
-    exit;
 }, 0);
 
 function atelier_language_toggle(): string {
