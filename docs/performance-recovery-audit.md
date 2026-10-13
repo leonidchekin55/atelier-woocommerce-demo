@@ -34,14 +34,15 @@ Render Free cold starts remain a hosting constraint.
 - Malformed media could write a valid prefix before rejecting an unsafe suffix.
   The entire authenticated manifest is validated before writing any file.
 - Duplicate and file/directory-conflicting paths now fail explicitly; symbolic
-  links in existing uploads fail before media writes.
+  links in existing uploads, including the uploads root itself, fail before
+  reading or writing media.
 - Missing or corrupt media now fails before importing the associated SQL.
   Existing current database/media snapshot format is unchanged.
 - A near-capacity restore failed with PHP's default 128 MiB memory limit.
-  Bounded gzip expansion, offset/length manifests and 64 KiB file writes avoid
-  copying every restored file into another in-memory collection. The regression
-  restores 60 MiB plus 16 MiB of simulated other state at 82.9–94.9 MiB peak
-  across local runs.
+  Media compression and decompression now stream through size-limited temporary
+  files, and restored files are copied in 64 KiB chunks. Recovery stages media
+  before decrypting SQL. The regression archives 60 MiB at 2 MiB peak, then
+  stages the archive while holding a 64 MiB SQL buffer at 66 MiB peak.
 - Russian output translation changed `document.body.className` into
   `classИмя`, causing JavaScript errors. Script/style/JSON blocks are preserved.
 - Dynamic mobile menu/filter labels now follow the selected language. Missing
@@ -61,9 +62,12 @@ new container restored the same order ID/status/items/total, private records,
 attachment ID, original file hash and generated image sizes.
 
 Missing and corrupted media snapshots were independently refused, with the
-new container's database unchanged. Ten isolated media regression cases
-and the near-capacity memory test passed. No production recovery repository,
-real customer data, payment gateway or live permissions were changed.
+new container's database unchanged. The integration check also confirmed that
+an SQL script that changes an option and then fails restores the previous
+database and live media tree. Twelve isolated media regression cases, symlink
+refusal before SQL import, file/directory collisions replaced from a staged
+tree, and the memory check passed. No production recovery repository, real
+customer data, payment gateway or live permissions were changed.
 
 Reproduction instructions: `tests/README.md`. This remains small-demo recovery,
 not an unlimited backup service or a permanent production database. Retention
@@ -76,11 +80,22 @@ native cart and fictional COD checkout; no JavaScript errors were observed.
 The final deployment image built successfully. Seven review lenses found no
 confirmed new defects.
 
-Recovery remains atomic per file, not across SQL and all media. Filesystem
-refusal after SQL import stops completion and keeps the applied marker unchanged.
-The memory test does not cover simultaneous maximum-size SQL and media archives.
+Recovery now validates and writes a complete media tree to a private staging
+directory before decrypting and importing SQL, then swaps that directory into
+place and removes the old tree. Before importing SQL, recovery saves the
+existing database to a private temporary dump (up to 64 MiB). Import or media
+swap failure triggers a compensating restore of the previous dump and removes
+newly created tables. MariaDB import itself is not transactional; if the
+compensating restore also fails, startup stays blocked and the private rollback
+file is retained for manual recovery.
+An existing persistent disk with the older flat uploads layout is copied into
+the new swappable directory at startup when that directory is still empty. If
+the process stops between directory renames, startup restores the retained old
+uploads tree before creating an empty directory.
 
 ## Publication
 
-These changes are local until explicitly approved for publication. The existing
-Render demo is not claimed to contain this audit's fixes yet.
+The original performance and recovery audit commit `81cc8eb` is live on Render
+from deployment `dep-db753mss728c73dfhm4g`. The staged-media recovery follow-up
+described above is local on `fix/stage-media-before-database-restore`; it has
+not been pushed or deployed.

@@ -21,31 +21,41 @@ def run(*command, expected=0):
 
 with tempfile.TemporaryDirectory(prefix='atelier-offline-recovery-') as folder:
     fixture = Path(folder)
+    fixture.chmod(0o755)
     runtime = {'ATELIER_STATE_REPO': 'ssh://git@ssh.github.com:443/offline/fixture.git',
                'ATELIER_STATE_KEY': base64.b64encode(secrets.token_bytes(32)).decode(),
                'ATELIER_STATE_SSH_KEY_B64': base64.b64encode(b'-----BEGIN OPENSSH PRIVATE KEY-----\noffline-test-only\n').decode(),
                'ATELIER_STATE_DIR': '/var/lib/atelier/fixture-state',
-               'ATELIER_STATE_UPLOADS_DIR': '/var/lib/atelier/uploads',
+               'ATELIER_STATE_UPLOADS_DIR': '/var/lib/atelier/uploads/current',
                'GIT_CONFIG_GLOBAL': '/fixture/gitconfig'}
     (fixture / 'runtime.json').write_text(json.dumps(runtime))
-    (fixture / 'runtime.json').chmod(0o600)
+    (fixture / 'runtime.json').chmod(0o644)
     (fixture / 'gitconfig').write_text('[url "/fixture/remote.git"]\n\tinsteadOf = ssh://git@ssh.github.com:443/offline/fixture.git\n')
     (fixture / 'operation.php').write_text('''<?php
 foreach (json_decode(file_get_contents('/fixture/runtime.json'), true) as $name => $value) putenv($name . '=' . $value);
 require_once '/usr/local/lib/atelier-state.php';
-try { ($argv[1] === 'save') ? Atelier_State::save() : Atelier_State::sync(); echo "Recovery operation completed.\\n"; }
+try {
+    if (($argv[1] ?? '') === 'save') Atelier_State::save();
+    elseif (($argv[1] ?? '') === 'bad-sql') file_put_contents('/fixture/broken/state.enc', Atelier_State::encrypt("UPDATE wp_options SET option_value='partially-imported' WHERE option_name='atelier_recovery_fixture';\nTHIS IS NOT VALID SQL;\n"));
+    elseif (($argv[1] ?? '') === 'status') { echo json_encode(Atelier_State::status()); exit(0); }
+    else Atelier_State::sync();
+    echo "Recovery operation completed.\\n";
+}
 catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1); }
 ''')
     names = []
     try:
-        def start(label, port):
+        def start(label, port, data_dir=None):
             name = 'atelier-recovery-' + label + '-' + secrets.token_hex(3)
             names.append(name)
-            run('docker', 'run', '-d', '--name', name, '-p', f'127.0.0.1:{port}:80',
+            command = ['docker', 'run', '-d', '--name', name, '-p', f'127.0.0.1:{port}:80',
                 '-e', 'WORDPRESS_DB_PASSWORD=local-fixture-only', '-e', 'ATELIER_ADMIN_USER=fixture',
                 '-e', 'ATELIER_ADMIN_PASSWORD=fictional-local-password', '-e', f'ATELIER_SITE_URL=http://127.0.0.1:{port}',
                 '-v', f'{fixture}:/fixture', '-v', f'{ROOT}/tests/recovery-fixture.php:/fixture-wp.php:ro',
-                '-v', f'{ROOT}/scripts/atelier-state.php:/usr/local/lib/atelier-state.php:ro', IMAGE)
+                '-v', f'{ROOT}/scripts/atelier-state.php:/usr/local/lib/atelier-state.php:ro']
+            if data_dir is not None:
+                command.extend(['-v', f'{data_dir}:/var/lib/atelier'])
+            run(*command, IMAGE)
             deadline = time.monotonic() + 300
             while time.monotonic() < deadline:
                 try:
@@ -60,6 +70,10 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         run('docker', 'exec', donor, 'git', 'init', '--bare', '-b', 'main', '/fixture/remote.git')
         wp(donor, 'seed')
         run('docker', 'exec', donor, 'php', '/fixture/operation.php', 'save')
+        status = json.loads(run('docker', 'exec', donor, 'php', '/fixture/operation.php', 'status'))
+        if status.get('database_bytes', 0) <= 0 or status.get('media_bytes', 0) <= 0:
+            raise RuntimeError('Recovery snapshot status omitted saved byte counts.')
+        print('PASS: completed encrypted snapshot reports database/media byte counts.', flush=True)
         saved = run('docker', 'exec', donor, 'git', '--git-dir=/fixture/remote.git', 'rev-parse', 'main')
         run('docker', 'rm', '-fv', donor)
         names.remove(donor)
@@ -80,8 +94,44 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
             wp(restored, 'unchanged')
             print(f'PASS: {mutation} media rejected before SQL import.', flush=True)
         run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'update-ref', 'refs/heads/main', saved)
-        run('docker', 'exec', restored, 'php', '/fixture/operation.php', 'restore')
+        run('docker', 'exec', restored, 'ln', '-s', '/tmp', '/var/lib/atelier/uploads/current/recovery-blocker')
+        run('docker', 'exec', restored, 'php', '/fixture/operation.php', 'restore', expected=1)
+        wp(restored, 'unchanged')
+        run('docker', 'exec', restored, 'rm', '/var/lib/atelier/uploads/current/recovery-blocker')
+        print('PASS: uploads symlink refused before SQL import.', flush=True)
+        run('docker', 'exec', restored, 'chown', '-R', 'www-data:www-data', '/var/lib/atelier/fixture-state', '/var/lib/atelier/uploads', '/var/lib/atelier/state')
+        run('docker', 'exec', restored, 'sh', '-c', "printf 'keep' > /var/lib/atelier/uploads/current/preserve-on-sql-failure")
+        wp(restored, 'baseline')
+        run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', 'reset', '--hard', saved)
+        run('docker', 'exec', restored, 'php', '/fixture/operation.php', 'bad-sql')
+        run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', 'add', 'state.enc')
+        run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', '-c', 'user.name=Offline test', '-c', 'user.email=offline@example.invalid', 'commit', '-m', 'invalid-sql')
+        broken = run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', 'rev-parse', 'HEAD')
+        run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'fetch', '/fixture/broken', 'HEAD')
+        run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'update-ref', 'refs/heads/main', broken)
+        run('docker', 'exec', '--user', 'www-data', restored, 'php', '/fixture/operation.php', 'restore', expected=1)
+        wp(restored, 'unchanged')
+        wp(restored, 'baseline-check')
+        run('docker', 'exec', restored, 'test', '-f', '/var/lib/atelier/uploads/current/preserve-on-sql-failure')
+        print('PASS: partial SQL import failure rolled back the database and preserved live media.', flush=True)
+        run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'update-ref', 'refs/heads/main', saved)
+        run('docker', 'exec', '--user', 'www-data', restored, 'php', '/fixture/operation.php', 'restore')
         wp(restored, 'verify')
+        legacy_disk = fixture / 'legacy-disk'
+        legacy_uploads = legacy_disk / 'uploads' / '2025'
+        legacy_uploads.mkdir(parents=True)
+        (legacy_uploads / 'kept.webp').write_bytes(b'legacy persistent upload')
+        legacy = start('legacy-layout', 18089, legacy_disk)
+        run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/current/2025/kept.webp')
+        run('docker', 'exec', legacy, 'test', '-L', '/var/www/html/wp-content/uploads')
+        print('PASS: legacy persistent uploads migrated to the swappable directory.', flush=True)
+        interrupted_disk = fixture / 'interrupted-disk'
+        previous_uploads = interrupted_disk / 'uploads' / '.atelier-previous-interrupted' / '2025'
+        previous_uploads.mkdir(parents=True)
+        (previous_uploads / 'kept.webp').write_bytes(b'uploads retained before interrupted swap')
+        interrupted = start('interrupted-swap', 18090, interrupted_disk)
+        run('docker', 'exec', interrupted, 'test', '-f', '/var/lib/atelier/uploads/current/2025/kept.webp')
+        print('PASS: startup restores the previous tree after an interrupted directory swap.', flush=True)
     finally:
         for name in names:
             subprocess.run(['docker', 'rm', '-fv', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

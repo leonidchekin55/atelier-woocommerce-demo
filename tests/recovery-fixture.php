@@ -23,6 +23,11 @@ if ($mode === 'seed') {
 } elseif ($mode === 'unchanged') {
     if (get_option('atelier_recovery_fixture') === 'recovery-roundtrip') throw new RuntimeException('Failed restore unexpectedly imported the database.');
     echo "Failed restore left the database unchanged.\n";
+} elseif ($mode === 'baseline') {
+    update_option('atelier_recovery_fixture', 'before-invalid-import');
+} elseif ($mode === 'baseline-check') {
+    if (get_option('atelier_recovery_fixture') !== 'before-invalid-import') throw new RuntimeException('Partial SQL import was not rolled back.');
+    echo "Partial SQL import was rolled back.\n";
 } elseif ($mode === 'verify') {
     $expected = json_decode(file_get_contents('/fixture/records.json'), true);
     $order = wc_get_order($expected['order']);

@@ -13,22 +13,31 @@ docker build -t atelier-audit-improved:latest .
 ATELIER_TEST_IMAGE=atelier-audit-improved:latest python3 tests/recovery-integration.py
 ```
 
-Requires Docker and Python 3; ports 18087/18088 must be free. The test replaces
-the entire donor container/database and removes both containers and temporary
+Requires Docker and Python 3; ports 18087–18090 must be free. The test replaces
+the entire donor container/database and removes all containers and temporary
 recovery data afterward. It verifies a native WooCommerce order, private inbox
-message/subscriber, newly uploaded attachment and generated thumbnails, and
-refusal of missing/corrupt media before SQL import.
+message/subscriber, newly uploaded attachment and generated thumbnails, refusal
+of missing/corrupt media or a symlink in uploads before SQL import, migration of
+files from the previous persistent-disk uploads path, and startup recovery of
+the old tree after an interrupted directory swap. It also applies a valid
+database change followed by invalid SQL and checks that the previous value is
+restored before startup continues.
+The standalone recovery checks also exercise authoritative replacement where
+existing files and folders have the opposite types from the snapshot.
 
 Standalone PHP checks can run in any disposable PHP 8.3 container that has the
 helper and test files mounted:
 
 ```sh
-php tests/recovery.php scripts/atelier-state.php
-php -d memory_limit=128M tests/recovery-memory.php scripts/atelier-state.php
+php -d auto_prepend_file= tests/recovery.php scripts/atelier-state.php
+php -d auto_prepend_file= -d memory_limit=128M tests/recovery-memory.php scripts/atelier-state.php save
+php -d auto_prepend_file= -d memory_limit=128M tests/recovery-memory.php scripts/atelier-state.php restore
 ```
 
-The memory test creates 60 MiB of temporary synthetic files; no customer data is
-read. Recovery tests require OpenSSL and zlib. The language check needs a local
+The memory test creates 60 MiB of temporary synthetic files. Its `save` phase
+archives them; its separate `restore` phase stages them before allocating a
+64 MiB SQL buffer. No customer data is read. Recovery tests require
+OpenSSL and zlib. The language check needs a local
 WordPress installation with the mu-plugin active:
 
 ```sh

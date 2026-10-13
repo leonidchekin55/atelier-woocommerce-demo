@@ -3,6 +3,30 @@ set -Eeuo pipefail
 
 DATA_DIR=/var/lib/atelier
 mkdir -p "$DATA_DIR/mysql" "$DATA_DIR/uploads" /run/mysqld
+# A process may stop between renaming the old uploads tree and installing its
+# prepared replacement. Restore the retained old tree before creating a blank one.
+if [[ ! -e "$DATA_DIR/uploads/current" && ! -L "$DATA_DIR/uploads/current" ]]; then
+  shopt -s nullglob
+  for backup in "$DATA_DIR/uploads"/.atelier-previous-*; do
+    if [[ -d "$backup" && ! -L "$backup" ]]; then
+      mv "$backup" "$DATA_DIR/uploads/current"
+      break
+    fi
+  done
+  shopt -u nullglob
+fi
+mkdir -p "$DATA_DIR/uploads/current"
+# Older releases stored uploads directly in /var/lib/atelier/uploads. Move
+# that layout into the swappable current directory on an existing Render disk.
+if [[ -z "$(find "$DATA_DIR/uploads/current" -mindepth 1 -print -quit)" ]]; then
+  shopt -s dotglob nullglob
+  for item in "$DATA_DIR/uploads"/*; do
+    [[ "$item" == "$DATA_DIR/uploads/current" ]] && continue
+    [[ "$(basename "$item")" == .atelier-* ]] && continue
+    cp -a "$item" "$DATA_DIR/uploads/current/"
+  done
+  shopt -u dotglob nullglob
+fi
 chown -R mysql:mysql /run/mysqld "$DATA_DIR/mysql"
 chown -R www-data:www-data "$DATA_DIR/uploads"
 
@@ -57,10 +81,10 @@ fi
 
 mkdir -p /var/www/html/wp-content/uploads
 if [ -d /var/www/html/wp-content/uploads ] && [ ! -L /var/www/html/wp-content/uploads ]; then
-  cp -a /var/www/html/wp-content/uploads/. "$DATA_DIR/uploads/"
+  cp -a /var/www/html/wp-content/uploads/. "$DATA_DIR/uploads/current/"
   rm -rf /var/www/html/wp-content/uploads
 fi
-ln -sfn "$DATA_DIR/uploads" /var/www/html/wp-content/uploads
+ln -sfn "$DATA_DIR/uploads/current" /var/www/html/wp-content/uploads
 chown -R www-data:www-data "$DATA_DIR/uploads"
 
 # Render Free can discard its container filesystem when the service spins down

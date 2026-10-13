@@ -66,6 +66,21 @@ try {
             throw new LogicException('symbolic link accepted');
         } finally { unlink($root . '/outside-link'); }
     });
+    check('uploads directory itself cannot be redirected through a symlink', function () use ($root, $snapshot) {
+        $alias = dirname($root) . '/atelier-recovery-alias-' . bin2hex(random_bytes(4));
+        symlink($root, $alias);
+        putenv('ATELIER_STATE_UPLOADS_DIR=' . $alias);
+        try {
+            foreach ([['restoreMedia', [$snapshot]], ['mediaArchive', []]] as [$method, $arguments]) {
+                try { call_private($method, ...$arguments); }
+                catch (RuntimeException $expected) { continue; }
+                throw new LogicException($method . ' accepted an uploads root symlink');
+            }
+        } finally {
+            putenv('ATELIER_STATE_UPLOADS_DIR=' . $root);
+            unlink($alias);
+        }
+    });
     check('modified ciphertext is rejected', function () use ($snapshot) {
         $bad = $snapshot; $bad[strlen($bad) - 1] = chr(ord($bad[strlen($bad) - 1]) ^ 1);
         try { call_private('restoreMedia', $bad); }
@@ -101,6 +116,13 @@ try {
             return;
         }
         throw new LogicException('oversized expanded payload accepted');
+    });
+    check('restore replaces stale directories with snapshot files and vice versa', function () use ($root) {
+        file_put_contents($root . '/existing-file', 'stale file');
+        call_private('restoreMedia', media_payload(entry('2026', 'snapshot file') . entry('existing-file/child.webp', 'snapshot child')));
+        expect(file_get_contents($root . '/2026') === 'snapshot file', 'directory-to-file collision was not replaced');
+        expect(file_get_contents($root . '/existing-file/child.webp') === 'snapshot child', 'file-to-directory collision was not replaced');
+        expect(!file_exists($root . '/2026/new-upload.webp'), 'stale upload survived the directory replacement');
     });
 } finally {
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
