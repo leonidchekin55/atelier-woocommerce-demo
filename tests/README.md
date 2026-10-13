@@ -46,6 +46,11 @@ wp eval-file tests/language.php --path=/path/to/local/wordpress
 
 ## Browser and performance
 
+`tests/catalog-filters.cjs` makes read-only catalog requests and checks EN/RU at
+320/1440 px: individual filter removal, multiple values, decimal prices,
+sorting/language/category preservation and malformed parameters. Run with the
+same Node/Playwright setup below. It also accepts the published demo URL.
+
 Use Node.js with Playwright and Chromium installed. Set `CHROMIUM_PATH` only if
 using an existing browser executable instead of Playwright's bundled browser.
 `NODE_PATH` can point to an already installed Playwright package directory.

@@ -14,6 +14,17 @@ add_filter('language_attributes', function ($attributes) {
     if (!is_admin()) $attributes = preg_replace('/\blang=("|\')[^"\']+\1/', 'lang="' . (atelier_language() === 'ru' ? 'ru-RU' : 'en-US') . '"', $attributes, 1);
     return $attributes;
 });
+add_filter('woocommerce_get_breadcrumb', function ($crumbs) {
+    if (is_admin() || atelier_language() !== 'ru') return $crumbs;
+    $shop_url = wc_get_page_permalink('shop');
+    $shop_title = get_post_field('post_title', wc_get_page_id('shop'));
+    foreach ($crumbs as $key => $crumb) {
+        if (($crumb[1] ?? '') === $shop_url || (is_shop() && empty($crumb[1]) && $crumb[0] === $shop_title)) {
+            $crumbs[$key][0] = 'Каталог';
+        }
+    }
+    return $crumbs;
+});
 add_action('init', function () {
     if (!isset($_GET['atelier_lang']) || !in_array($_GET['atelier_lang'], ['ru', 'en'], true) || is_admin()) return;
     $value = sanitize_key(wp_unslash($_GET['atelier_lang']));
