@@ -171,32 +171,86 @@ final class Atelier_State {
         if (strlen($data) > self::MEDIA_MAX) throw new RuntimeException('Demo media recovery capacity exceeded.');
         return $data;
     }
-    private static function restoreMedia(string $data): void {
+    /** Authenticate and validate the complete manifest before touching live files. */
+    private static function mediaFiles(string $data): array {
         if (!str_starts_with($data, self::MEDIA_MAGIC) || strlen($data) > self::MEDIA_MAX) throw new RuntimeException('Invalid media recovery file.');
-        $offset = strlen(self::MEDIA_MAGIC); $body = substr($data, $offset);
-        $compressed = openssl_decrypt(substr($body, 28), 'aes-256-gcm', self::key(), OPENSSL_RAW_DATA, substr($body, 0, 12), substr($body, 12, 16), self::MEDIA_AAD);
+        $offset = strlen(self::MEDIA_MAGIC);
+        $compressed = openssl_decrypt(substr($data, $offset + 28), 'aes-256-gcm', self::key(), OPENSSL_RAW_DATA, substr($data, $offset, 12), substr($data, $offset + 12, 16), self::MEDIA_AAD);
         if ($compressed === false) throw new RuntimeException('Media recovery authentication failed.');
-        $payload = gzdecode($compressed, self::MEDIA_EXPANDED_MAX); unset($compressed);
-        if ($payload === false || !str_starts_with($payload, self::MEDIA_MAGIC)) throw new RuntimeException('Media recovery decompression failed.');
-        $position = strlen(self::MEDIA_MAGIC); $root = self::uploadsDir();
+        // Small compressed chunks avoid gzdecode's full-size temporary buffer.
+        $inflate = inflate_init(ZLIB_ENCODING_GZIP); $payload = '';
+        if ($inflate === false) throw new RuntimeException('Media recovery decompression failed.');
+        for ($position = 0, $length = strlen($compressed); $position < $length; $position += 1024) {
+            $last = $position + 1024 >= $length;
+            $chunk = inflate_add($inflate, substr($compressed, $position, 1024), $last ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
+            if ($chunk === false || strlen($payload) + strlen($chunk) > self::MEDIA_EXPANDED_MAX) throw new RuntimeException('Media recovery decompression failed.');
+            $payload .= $chunk;
+        }
+        if (inflate_get_status($inflate) !== ZLIB_STREAM_END || inflate_get_read_len($inflate) !== strlen($compressed) || !str_starts_with($payload, self::MEDIA_MAGIC)) throw new RuntimeException('Media recovery decompression failed.');
+        unset($compressed, $chunk, $inflate);
+        $position = strlen(self::MEDIA_MAGIC); $files = [];
+        while ($position < strlen($payload)) {
+            if (count($files) >= 2000 || $position + 12 > strlen($payload)) throw new RuntimeException('Invalid media manifest.');
+            $nameLength = unpack('N', substr($payload, $position, 4))[1]; $size = unpack('J', substr($payload, $position + 4, 8))[1]; $position += 12;
+            if ($nameLength < 1 || $nameLength > 1024 || $size < 0 || $size > self::MEDIA_EXPANDED_MAX || $position + $nameLength + $size > strlen($payload)) throw new RuntimeException('Invalid media manifest.');
+            $relative = substr($payload, $position, $nameLength); $position += $nameLength;
+            if (str_contains($relative, "\0") || str_contains($relative, '\\') || str_starts_with($relative, '/') || preg_match('~(^|/)\.\.?(/|$)~', $relative) || str_contains($relative, '//') || str_ends_with($relative, '/')) throw new RuntimeException('Unsafe media path.');
+            if (array_key_exists($relative, $files)) throw new RuntimeException('Duplicate media path.');
+            $files[$relative] = [$position, $size]; $position += $size;
+        }
+        foreach ($files as $relative => $bytes) {
+            $parent = dirname($relative);
+            while ($parent !== '.') {
+                if (array_key_exists($parent, $files)) throw new RuntimeException('Conflicting media paths.');
+                $parent = dirname($parent);
+            }
+        }
+        return ['payload' => $payload, 'files' => $files];
+    }
+    private static function restoreMedia(string $data): void {
+        self::writeMedia(self::mediaFiles($data));
+    }
+    private static function writeMedia(array $archive): void {
+        $payload = $archive['payload']; $files = $archive['files'];
+        $root = self::uploadsDir();
         if (!is_dir($root) && !mkdir($root, 0755, true)) throw new RuntimeException('Media recovery directory is unavailable.');
         $root = realpath($root); if ($root === false) throw new RuntimeException('Media recovery directory is unavailable.');
-        $count = 0;
-        while ($position < strlen($payload)) {
-            if (++$count > 2000 || $position + 12 > strlen($payload)) throw new RuntimeException('Invalid media manifest.');
-            $nameLength = unpack('N', substr($payload, $position, 4))[1]; $size = unpack('J', substr($payload, $position + 4, 8))[1]; $position += 12;
-            if ($nameLength < 1 || $nameLength > 1024 || $size > self::MEDIA_EXPANDED_MAX || $position + $nameLength + $size > strlen($payload)) throw new RuntimeException('Invalid media manifest.');
-            $relative = substr($payload, $position, $nameLength); $position += $nameLength;
-            if (str_contains($relative, "\0") || str_contains($relative, '\\') || str_starts_with($relative, '/') || preg_match('~(^|/)\.\.?(/|$)~', $relative)) throw new RuntimeException('Unsafe media path.');
+        // Refuse links before modifying any file, including links to directories.
+        $existing = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        foreach ($existing as $entry) if ($entry->isLink()) throw new RuntimeException('Unsafe existing media path.');
+        foreach ($files as $relative => [$offset, $size]) {
             $target = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
             $parent = dirname($target); if (!is_dir($parent) && !mkdir($parent, 0755, true)) throw new RuntimeException('Media directory could not be restored.');
             $parentReal = realpath($parent);
             if ($parentReal === false || !str_starts_with($parentReal . DIRECTORY_SEPARATOR, $root . DIRECTORY_SEPARATOR)) throw new RuntimeException('Unsafe media path.');
             $temporary = tempnam($parentReal, '.atelier-');
-            if ($temporary === false || file_put_contents($temporary, substr($payload, $position, $size), LOCK_EX) !== $size || !rename($temporary, $target)) { if ($temporary) @unlink($temporary); throw new RuntimeException('Media file could not be restored.'); }
-            chmod($target, 0644); $position += $size;
+            if ($temporary === false) throw new RuntimeException('Media file could not be restored.');
+            $stream = fopen($temporary, 'wb');
+            if (!$stream) { @unlink($temporary); throw new RuntimeException('Media file could not be restored.'); }
+            try {
+                $end = $offset + $size;
+                while ($offset < $end) {
+                    $written = fwrite($stream, substr($payload, $offset, min(65536, $end - $offset)));
+                    if ($written === false || $written === 0) throw new RuntimeException('Media file could not be restored.');
+                    $offset += $written;
+                }
+                if (!fclose($stream)) throw new RuntimeException('Media file could not be restored.');
+                $stream = null;
+                if (!rename($temporary, $target)) throw new RuntimeException('Media file could not be restored.');
+            } finally {
+                if (is_resource($stream)) fclose($stream);
+                if (is_file($temporary)) @unlink($temporary);
+            }
+            chmod($target, 0644);
         }
-        unset($payload);
+        // The latest snapshot is authoritative: do not resurrect deleted uploads.
+        $existing = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($existing as $entry) {
+            $path = $entry->getPathname();
+            $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($path, strlen($root) + 1));
+            if ($entry->isFile() && !array_key_exists($relative, $files) && !unlink($path)) throw new RuntimeException('Stale media file could not be removed.');
+            if ($entry->isDir() && count(scandir($path)) === 2 && !rmdir($path)) throw new RuntimeException('Stale media directory could not be removed.');
+        }
     }
     public static function sync(): void {
         self::lock(); self::prepare();
@@ -215,9 +269,11 @@ final class Atelier_State {
             $path = self::dir() . '/repo/state.enc';
             if (!is_file($path)) throw new RuntimeException('Recovery snapshot is missing.');
             $sql = self::decrypt(file_get_contents($path));
-            self::run(['mariadb', '--defaults-extra-file=' . self::mysqlOptions(), self::database()], $sql);
             $media = self::dir() . '/repo/media.enc';
-            if (is_file($media)) self::restoreMedia(file_get_contents($media));
+            if (!is_file($media)) throw new RuntimeException('Media recovery snapshot is missing.');
+            $files = self::mediaFiles(file_get_contents($media));
+            self::run(['mariadb', '--defaults-extra-file=' . self::mysqlOptions(), self::database()], $sql);
+            self::writeMedia($files);
             file_put_contents(self::dir() . '/applied', $remote, LOCK_EX);
         }
     }
