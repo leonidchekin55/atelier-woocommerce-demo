@@ -4,6 +4,10 @@ if (!defined('ABSPATH')) exit;
 // Keep one-result searches in the catalog so visitors can refine their filters.
 add_filter('woocommerce_redirect_single_search_result', '__return_false');
 
+add_action('woocommerce_no_products_found', function () {
+    echo '<p class="empty-catalog-action"><a class="button button-dark" href="' . esc_url(wc_get_page_permalink('shop')) . '">Browse all pieces</a></p>';
+}, 20);
+
 function atelier_filter_form() {
     if (!function_exists('is_shop') || !(is_shop() || is_product_taxonomy())) return;
     $min = isset($_GET['min_price']) && is_string($_GET['min_price']) ? wc_clean(wp_unslash($_GET['min_price'])) : '';
@@ -19,7 +23,7 @@ function atelier_filter_form() {
             <div class="filter-block"><h3><?php echo esc_html($label); ?></h3><?php foreach ($terms as $term): ?><label class="check-option"><input type="checkbox" name="atelier_<?php echo esc_attr($key); ?>[]" value="<?php echo esc_attr($term->slug); ?>" <?php checked(in_array($term->slug, $selected, true)); ?>><span><?php echo esc_html($term->name); ?></span></label><?php endforeach; ?></div>
         <?php endforeach; ?>
         <button class="button button-dark" type="submit">Apply filters</button>
-        <?php if ($min !== '' || $max !== '' || $color || $material): ?><a class="filter-reset" href="<?php echo esc_url(remove_query_arg(['min_price', 'max_price', 'atelier_color', 'atelier_material'])); ?>">Clear filters</a><?php endif; ?>
+        <?php if ($min !== '' || $max !== '' || $color || $material || get_search_query(false) !== ''): ?><a class="filter-reset" href="<?php echo esc_url(remove_query_arg(['min_price', 'max_price', 'atelier_color', 'atelier_material', 's', 'paged', 'product-page'])); ?>">Clear filters</a><?php endif; ?>
         <?php if (is_product_taxonomy()): ?><input type="hidden" name="product_cat" value="<?php echo esc_attr(get_queried_object()->slug); ?>"><?php endif; ?>
     </form><?php
 }

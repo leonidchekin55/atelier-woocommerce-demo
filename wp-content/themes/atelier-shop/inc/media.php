@@ -1,6 +1,15 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/** Responsive bundled photos; native lazy loading also works without JavaScript. */
+function atelier_editorial_image(string $photo, string $class, string $sizes, bool $priority = false): string {
+    $photo = sanitize_file_name($photo);
+    $base = get_template_directory_uri() . '/assets/images/' . $photo;
+    $dimensions = getimagesize(get_template_directory() . '/assets/images/' . $photo . '-wide.webp');
+    if (!$dimensions) return '';
+    return '<img class="' . esc_attr($class) . '" src="' . esc_url($base . '-wide.webp') . '" srcset="' . esc_attr($base . '.webp 1000w, ' . $base . '-wide.webp 1800w') . '" sizes="' . esc_attr($sizes) . '" width="' . (int)$dimensions[0] . '" height="' . (int)$dimensions[1] . '" alt="" decoding="async" loading="' . ($priority ? 'eager' : 'lazy') . '"' . ($priority ? ' fetchpriority="high"' : '') . '>';
+}
+
 // Use real attachments so galleries, cart thumbnails and Store API agree.
 add_action('init', function () {
     if (!class_exists('WooCommerce') || get_option('atelier_product_media_seeded')) return;

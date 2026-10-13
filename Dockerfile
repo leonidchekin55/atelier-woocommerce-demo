@@ -27,6 +27,7 @@ RUN set -eu; \
 
 COPY wp-content/themes/atelier-shop /usr/src/wordpress/wp-content/themes/atelier-shop
 COPY wp-content/mu-plugins /usr/src/wordpress/wp-content/mu-plugins
+COPY apache-wordpress.conf /etc/apache2/conf-enabled/atelier-wordpress.conf
 COPY scripts/atelier-state.php scripts/atelier-request.php scripts/github-known-hosts /usr/local/lib/
 RUN mv /usr/local/lib/github-known-hosts /usr/local/lib/atelier-github-known-hosts \
     && printf 'auto_prepend_file=/usr/local/lib/atelier-request.php\n' > /usr/local/etc/php/conf.d/atelier-state.ini

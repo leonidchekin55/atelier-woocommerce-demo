@@ -11,7 +11,7 @@ Verified locally on 2026-10-10 using Chromium with real WordPress and WooCommerc
 - The contact template now closes its textarea correctly. A browser submission succeeds and creates a private WordPress inbox message.
 - Changed PHP files, JavaScript and the startup shell script pass syntax checks.
 
-Render Free rebuilds the demo catalog and media library after losing its filesystem. Test orders, messages, subscribers and manual dashboard changes are disposable. The images are illustrative demo photography; a real store needs photographs of its actual products.
+Render Free loses its local filesystem; the configured encrypted recovery restores orders, messages, subscribers and captured dashboard changes. Without recovery configuration those changes are disposable. The images are illustrative demo photography; a real store needs photographs of its actual products.
 
 
 ## Durable demo recovery — 2026-10-10
