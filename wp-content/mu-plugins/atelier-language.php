@@ -43,9 +43,12 @@ function atelier_translate_storefront(string $html): string {
         'Shop all pieces' => 'Весь каталог', 'GOOD THINGS TAKE TIME' => 'ХОРОШИЕ ВЕЩИ НЕ СПЕШАТ', 'Made with hands.<br><em>Kept with heart.</em>' => 'Создано руками.<br><em>Остаётся в сердце.</em>',
         'Small batches, natural materials and makers who care about every detail. That’s our kind of progress.' => 'Небольшие серии, натуральные материалы и мастера, внимательные к каждой детали. Вот что для нас важно.',
         'Inside the studio' => 'Заглянуть в мастерскую', 'FIND YOUR EVERYDAY' => 'НАЙДИТЕ СВОЁ', 'Shop by feeling.' => 'Выбирайте по настроению.',
+        'Gather <em>around.</em>' => 'Вместе <em>за столом.</em>', 'Soft things,<br><em>slow days.</em>' => 'Мягкие вещи,<br><em>тихие дни.</em>',
+        '01 / TABLE' => '01 / СТОЛ', '02 / TEXTURE' => '02 / ТЕКСТУРА', 'SPRING EDITION' => 'ВЕСЕННЯЯ КОЛЛЕКЦИЯ',
+        '>Contact<' => '>Контакты<', 'Close filters' => 'Закрыть фильтры',
         'Shop ceramics ↗' => 'Керамика ↗', 'Shop textiles ↗' => 'Текстиль ↗', 'Useful things, made thoughtfully. Find the pieces you’ll reach for every day.' => 'Продуманные вещи для жизни. Найдите то, чем будете пользоваться каждый день.',
         'Search products' => 'Поиск товаров', 'Name or description' => 'Название или описание', 'Price range' => 'Цена', 'From' => 'От', 'To' => 'До',
-        '>Color<' => '>Цвет<', '>Material<' => '>Материал<', 'Apply filters' => 'Применить фильтры', 'Clear filters' => 'Сбросить фильтры',
+        '>Color<' => '>Цвет<', '>Material<' => '>Материал<', 'Apply filters' => 'Применить фильтры', 'Clear filters' => 'Сбросить фильтры', 'Browse all pieces' => 'Посмотреть все товары',
         '>Filters ' => '>Фильтры ', '>Refine<' => '>Уточнить выбор<', 'Search' => 'Поиск', 'View piece ↗' => 'Подробнее ↗',
         'WE’RE REAL PEOPLE' => 'МЫ НА СВЯЗИ', 'Say <em>hello.</em>' => 'Напишите <em>нам.</em>', 'GET IN TOUCH' => 'КАК С НАМИ СВЯЗАТЬСЯ',
         'Use the message form ↗' => 'Открыть форму ↗', 'STUDIO HOURS' => 'ЧАСЫ РАБОТЫ', 'ORDERS' => 'ЗАКАЗЫ', 'Track an order ↗' => 'Проверить заказ ↗',
@@ -100,6 +103,10 @@ function atelier_translate_storefront(string $html): string {
         'Sand' => 'Песочный', 'Ivory' => 'Слоновая кость', 'Olive' => 'Оливковый', 'Terracotta' => 'Терракотовый',
         'Stoneware' => 'Каменная керамика', 'Linen' => 'Лён', 'Oak' => 'Дуб', 'Glass' => 'Стекло',
     ];
-    return strtr($html, $copy);
+    // Translate copy without rewriting executable code, JSON or CSS identifiers.
+    $parts = preg_split('~(<script\b[^>]*>.*?</script\s*>|<style\b[^>]*>.*?</style\s*>)~is', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+    if ($parts === false) return $html;
+    foreach ($parts as $index => $part) if ($index % 2 === 0) $parts[$index] = strtr($part, $copy);
+    return implode('', $parts);
 }
 add_action('template_redirect', function () { if (!is_admin()) ob_start('atelier_translate_storefront'); }, 0);
