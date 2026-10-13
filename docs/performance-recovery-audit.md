@@ -97,5 +97,8 @@ uploads tree before creating an empty directory.
 
 The original performance and recovery audit commit `81cc8eb` is live on Render
 from deployment `dep-db753mss728c73dfhm4g`. The staged-media recovery follow-up
-described above is local on `fix/stage-media-before-database-restore`; it has
-not been pushed or deployed.
+is commit `8d916f4`, pushed to the existing PR #5 and its Render-linked branch
+`fix/performance-recovery-audit`. After the push, the public home, shop, about,
+journal, contact, FAQ, Russian shop, and sitemap endpoints all returned HTTP
+200. Render's authenticated deployment details were not available in this
+environment, so the exact deployment ID and deployed commit were not confirmed.
