@@ -13,6 +13,11 @@ RUN curl -fsSL https://downloads.wordpress.org/plugin/woocommerce.11.2.0.zip -o 
     && unzip -q /tmp/woocommerce.zip -d /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/woocommerce.zip
 
+# FluentSMTP is part of the image so it survives Render Free container resets.
+RUN curl -fsSL https://downloads.wordpress.org/plugin/fluent-smtp.2.4.1.zip -o /tmp/fluent-smtp.zip \
+    && unzip -q /tmp/fluent-smtp.zip -d /usr/src/wordpress/wp-content/plugins \
+    && rm /tmp/fluent-smtp.zip
+
 # Bundle official Russian translations so the language switch works without
 # a runtime download or a database change to the store's default language.
 RUN set -eu; \
@@ -40,7 +45,7 @@ RUN chmod +x /usr/local/bin/atelier-entrypoint \
 ENV WORDPRESS_DB_HOST=127.0.0.1 \
     WORDPRESS_DB_NAME=atelier \
     WORDPRESS_DB_USER=atelier \
-    WORDPRESS_CONFIG_EXTRA="define('DISALLOW_FILE_EDIT', true); define('WP_AUTO_UPDATE_CORE', 'minor');"
+    WORDPRESS_CONFIG_EXTRA="define('DISALLOW_FILE_EDIT', true); define('WP_AUTO_UPDATE_CORE', 'minor'); if (getenv('BREVO_API_KEY')) { define('FLUENTMAIL_SENDINBLUE_API_KEY', getenv('BREVO_API_KEY')); }"
 
 ENTRYPOINT ["atelier-entrypoint"]
 

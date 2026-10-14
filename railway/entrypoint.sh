@@ -148,6 +148,25 @@ EOF
   wp eval 'update_option("active_plugins", array_values(array_filter((array)get_option("active_plugins"), function ($plugin) { return !preg_match("~^atelier-(export|bridge|hold)-plugin/~", $plugin); })));' "${wp_args[@]}" >/dev/null
   wp plugin is-active woocommerce "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate woocommerce "${wp_args[@]}"
   wp theme is-active atelier-shop "${wp_args[@]}" >/dev/null 2>&1 || wp theme activate atelier-shop "${wp_args[@]}"
+  if [[ -n "${BREVO_API_KEY:-}" && -n "${BREVO_SENDER_EMAIL:-}" && -n "${BREVO_OWNER_EMAIL:-}" ]]; then
+    wp plugin is-installed fluent-smtp "${wp_args[@]}" || { echo 'FluentSMTP is missing from the image.' >&2; exit 1; }
+    wp plugin is-active fluent-smtp "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate fluent-smtp "${wp_args[@]}"
+    wp eval '
+      $email = sanitize_email(getenv("BREVO_SENDER_EMAIL"));
+      if (!is_email($email) || !defined("FLUENTMAIL_SENDINBLUE_API_KEY") || !FLUENTMAIL_SENDINBLUE_API_KEY) { throw new RuntimeException("Brevo mail configuration is incomplete."); }
+      $owner = sanitize_email(getenv("BREVO_OWNER_EMAIL"));
+      if (!is_email($owner)) { throw new RuntimeException("Brevo owner email is invalid."); }
+      $key = md5($email);
+      $settings = fluentMailGetSettings();
+      $settings["connections"][$key] = ["title" => "Sendinblue", "provider_settings" => ["provider" => "SendInBlue", "sender_name" => "Atelier", "sender_email" => $email, "force_from_name" => "yes", "key_store" => "wp_config", "api_key" => ""]];
+      $settings["mappings"][$email] = $key;
+      $settings["misc"]["default_connection"] = $key;
+      if (!fluentMailSetSettings($settings)) { throw new RuntimeException("Could not save FluentSMTP settings."); }
+      update_option("woocommerce_new_order_recipient", $owner);
+    ' "${wp_args[@]}" >/dev/null
+  else
+    wp plugin is-active fluent-smtp "${wp_args[@]}" >/dev/null 2>&1 && wp plugin deactivate fluent-smtp "${wp_args[@]}" >/dev/null
+  fi
   wp option update home "$site_url" "${wp_args[@]}" >/dev/null
   wp option update siteurl "$site_url" "${wp_args[@]}" >/dev/null
   if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
