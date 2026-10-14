@@ -161,7 +161,14 @@ EOF
       $settings["connections"][$key] = ["title" => "Sendinblue", "provider_settings" => ["provider" => "SendInBlue", "sender_name" => "Atelier", "sender_email" => $email, "force_from_name" => "yes", "key_store" => "wp_config", "api_key" => ""]];
       $settings["mappings"][$email] = $key;
       $settings["misc"]["default_connection"] = $key;
-      if (!fluentMailSetSettings($settings)) { throw new RuntimeException("Could not save FluentSMTP settings."); }
+      // WordPress returns false when an option already has the requested value.
+      fluentMailSetSettings($settings);
+      $saved = fluentMailGetSettings([], false);
+      if (($saved["connections"][$key] ?? null) !== $settings["connections"][$key]
+        || ($saved["mappings"][$email] ?? null) !== $key
+        || ($saved["misc"]["default_connection"] ?? null) !== $key) {
+        throw new RuntimeException("Could not save FluentSMTP settings.");
+      }
       update_option("woocommerce_new_order_recipient", $owner);
     ' "${wp_args[@]}" >/dev/null
   else
