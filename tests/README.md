@@ -13,7 +13,7 @@ docker build -t atelier-audit-improved:latest .
 ATELIER_TEST_IMAGE=atelier-audit-improved:latest python3 tests/recovery-integration.py
 ```
 
-Requires Docker and Python 3; ports 18087–18090 must be free. The test replaces
+Requires Docker and Python 3; ports 18087–18091 must be free. The test replaces
 the entire donor container/database and removes all containers and temporary
 recovery data afterward. It verifies a native WooCommerce order, private inbox
 message/subscriber, newly uploaded attachment and generated thumbnails, refusal
@@ -21,7 +21,9 @@ of missing/corrupt media or a symlink in uploads before SQL import, migration of
 files from the previous persistent-disk uploads path, and startup recovery of
 the old tree after an interrupted directory swap. It also applies a valid
 database change followed by invalid SQL and checks that the previous value is
-restored before startup continues.
+restored before startup continues. A final isolated startup uses fictional
+Brevo settings and verifies that FluentSMTP resolves the configured provider
+without making any external email request.
 The standalone recovery checks also exercise authoritative replacement where
 existing files and folders have the opposite types from the snapshot.
 

@@ -158,7 +158,7 @@ EOF
       if (!is_email($owner)) { throw new RuntimeException("Brevo owner email is invalid."); }
       $key = md5($email);
       $settings = fluentMailGetSettings();
-      $settings["connections"][$key] = ["title" => "Sendinblue", "provider_settings" => ["provider" => "SendInBlue", "sender_name" => "Atelier", "sender_email" => $email, "force_from_name" => "yes", "key_store" => "wp_config", "api_key" => ""]];
+      $settings["connections"][$key] = ["title" => "Sendinblue", "provider_settings" => ["provider" => "sendinblue", "sender_name" => "Atelier", "sender_email" => $email, "force_from_name" => "yes", "key_store" => "wp_config", "api_key" => ""]];
       $settings["mappings"][$email] = $key;
       $settings["misc"]["default_connection"] = $key;
       // WordPress returns false when an option already has the requested value.
