@@ -1,12 +1,61 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.7.1');
+define('ATELIER_VERSION', '1.8.0');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/media.php';
 require_once get_template_directory() . '/inc/filters.php';
 require_once get_template_directory() . '/inc/forms.php';
+
+/** Make WooCommerce's transactional messages clear and consistent for the demo store. */
+function atelier_demo_email_additional_content($content) {
+    $message = current_filter();
+    $email_id = str_replace('woocommerce_email_additional_content_', '', $message);
+    $messages = [
+        'new_order' => 'Atelier Home demo notice: this order was placed for demonstration. No payment or fulfillment is required.',
+        'cancelled_order' => 'Atelier Home demo notice: this order was cancelled in the demonstration store. No payment or fulfillment is required.',
+        'customer_cancelled_order' => 'This was a demonstration order. It has been cancelled; no payment was collected and nothing will be shipped.',
+        'customer_processing_order' => 'This is a demonstration order. No payment will be collected and no items will be shipped. You can continue exploring the store below.',
+        'customer_completed_order' => 'This demonstration order has been marked complete. No payment was collected and no items were shipped. Thank you for trying Atelier Home.',
+        'customer_on_hold_order' => 'This is a demonstration order. No payment will be collected and no items will be shipped.',
+    ];
+
+    if (!isset($messages[$email_id])) return $content;
+
+    $demo_note = $messages[$email_id] . "\n\nExplore Atelier Home: " . home_url('/');
+    return trim((string) $content) === '' ? $demo_note : rtrim((string) $content) . "\n\n" . $demo_note;
+}
+
+add_filter('woocommerce_email_footer_text', function ($text) {
+    return 'Atelier Home — demo store. Orders are for demonstration only; no payment or fulfillment is processed. {site_url}';
+});
+
+add_filter('woocommerce_email_from_name', function ($name) {
+    return 'Atelier Home (Demo)';
+});
+
+foreach ([
+    'new_order' => 'New demo order',
+    'cancelled_order' => 'Demo order cancelled',
+    'customer_cancelled_order' => 'Your demo order was cancelled',
+    'customer_processing_order' => 'Your Atelier Home demo order',
+    'customer_completed_order' => 'Your Atelier Home demo order is complete',
+    'customer_on_hold_order' => 'Your Atelier Home demo order',
+] as $email_id => $heading) {
+    add_filter('woocommerce_email_additional_content_' . $email_id, 'atelier_demo_email_additional_content', 10, 3);
+    add_filter('woocommerce_email_heading_' . $email_id, static function ($current) use ($heading) { return $heading; });
+    add_filter('woocommerce_email_subject_' . $email_id, static function ($current) { return 'Atelier Home demo — ' . $current; });
+}
+
+add_filter('woocommerce_email_styles', function ($css) {
+    return $css . "\n/* Atelier Home: keep transactional email content readable on narrow screens. */\n"
+        . '#template_container{width:100%!important;max-width:600px!important}'
+        . '#template_body,#body_content{width:100%!important}'
+        . '#body_content_inner{font-size:15px!important;line-height:1.65!important}'
+        . '#body_content a{overflow-wrap:anywhere}'
+        . '@media only screen and (max-width:600px){#template_container{width:100%!important}#body_content_inner{padding:20px 16px!important;font-size:14px!important}#header_wrapper{padding:22px 16px!important}}';
+});
 
 /** Give search and social previews useful, page-specific metadata without a plugin. */
 function atelier_seo_description(): string {

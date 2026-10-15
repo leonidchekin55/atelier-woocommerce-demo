@@ -47,6 +47,18 @@ WordPress installation with the mu-plugin active:
 wp eval-file tests/language.php --path=/path/to/local/wordpress
 ```
 
+WooCommerce transactional email checks run on a disposable local store. The
+copy check validates sender/subject branding, order instructions, site links,
+mobile styles, and that unrelated account emails are untouched. The lifecycle
+check creates two fictional COD orders, intercepts every `wp_mail` call before
+delivery, verifies owner/customer notices for processing, cancellation, and
+completion, then permanently deletes both orders:
+
+```sh
+wp eval-file tests/email-copy.php --path=/path/to/local/wordpress
+wp eval-file tests/order-emails.php --path=/path/to/local/wordpress
+```
+
 ## Browser and performance
 
 `tests/catalog-filters.cjs` makes read-only catalog requests and checks EN/RU at
