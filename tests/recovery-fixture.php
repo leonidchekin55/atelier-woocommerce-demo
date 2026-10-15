@@ -40,7 +40,10 @@ if ($mode === 'seed') {
     $handler = $factory->make($provider);
     if ($provider !== 'sendinblue') throw new RuntimeException('Brevo connection did not save the FluentSMTP provider key.');
     if (!$handler instanceof \FluentMail\App\Services\Mailer\BaseHandler) throw new RuntimeException('FluentSMTP did not resolve the Brevo provider.');
-    echo "PASS: bootstrapped Brevo provider resolves to the FluentSMTP mail handler.\n";
+    $newOrderSettings = get_option('woocommerce_new_order_settings', []);
+    if (($newOrderSettings['enabled'] ?? '') !== 'yes') throw new RuntimeException('WooCommerce new-order owner notifications are not enabled.');
+    if (($newOrderSettings['recipient'] ?? '') !== 'atelier-owner@example.invalid') throw new RuntimeException('WooCommerce new-order owner recipient was not configured.');
+    echo "PASS: FluentSMTP provider and WooCommerce owner notification settings are valid.\n";
 } elseif ($mode === 'verify') {
     $expected = json_decode(file_get_contents('/fixture/records.json'), true);
     $order = wc_get_order($expected['order']);
