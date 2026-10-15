@@ -169,7 +169,16 @@ EOF
         || ($saved["misc"]["default_connection"] ?? null) !== $key) {
         throw new RuntimeException("Could not save FluentSMTP settings.");
       }
-      update_option("woocommerce_new_order_recipient", $owner);
+      $newOrderSettings = get_option("woocommerce_new_order_settings", []);
+      if (!is_array($newOrderSettings)) { $newOrderSettings = []; }
+      $newOrderSettings["enabled"] = "yes";
+      $newOrderSettings["recipient"] = $owner;
+      update_option("woocommerce_new_order_settings", $newOrderSettings);
+      $savedNewOrderSettings = get_option("woocommerce_new_order_settings", []);
+      if (($savedNewOrderSettings["enabled"] ?? "") !== "yes"
+        || ($savedNewOrderSettings["recipient"] ?? "") !== $owner) {
+        throw new RuntimeException("Could not save WooCommerce new-order email settings.");
+      }
     ' "${wp_args[@]}" >/dev/null
   else
     wp plugin is-active fluent-smtp "${wp_args[@]}" >/dev/null 2>&1 && wp plugin deactivate fluent-smtp "${wp_args[@]}" >/dev/null
