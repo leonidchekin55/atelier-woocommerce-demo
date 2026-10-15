@@ -1,6 +1,17 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+// WooCommerce treats a submitted empty upper price bound as zero.
+// Empty form fields must behave like omitted bounds; an explicit zero is valid.
+function atelier_normalize_price_filters() {
+    foreach (['min_price', 'max_price'] as $parameter) {
+        if (isset($_GET[$parameter]) && is_string($_GET[$parameter]) && trim($_GET[$parameter]) === '') {
+            unset($_GET[$parameter]);
+        }
+    }
+}
+add_action('init', 'atelier_normalize_price_filters', 1);
+
 // Keep one-result searches in the catalog so visitors can refine their filters.
 add_filter('woocommerce_redirect_single_search_result', '__return_false');
 

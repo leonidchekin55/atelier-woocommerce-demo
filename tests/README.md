@@ -61,6 +61,10 @@ wp eval-file tests/order-emails.php --path=/path/to/local/wordpress
 
 ## Browser and performance
 
+`wp eval-file tests/price-filters.php --path=/path/to/local/wordpress` checks
+that empty price bounds are omitted while explicit zero and decimal bounds
+remain unchanged. Search-only filter submissions must still find products.
+
 `tests/catalog-filters.cjs` makes read-only catalog requests and checks EN/RU at
 320/1440 px: individual filter removal, multiple values, decimal prices,
 sorting/language/category preservation and malformed parameters. Run with the
