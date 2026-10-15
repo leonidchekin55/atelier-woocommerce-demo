@@ -28,6 +28,19 @@ if ($mode === 'seed') {
 } elseif ($mode === 'baseline-check') {
     if (get_option('atelier_recovery_fixture') !== 'before-invalid-import') throw new RuntimeException('Partial SQL import was not rolled back.');
     echo "Partial SQL import was rolled back.\n";
+} elseif ($mode === 'brevo-provider') {
+    $sender = 'atelier-sender@example.invalid';
+    $connectionKey = md5($sender);
+    $settings = fluentMailGetSettings([], false);
+    $provider = $settings['connections'][$connectionKey]['provider_settings']['provider'] ?? null;
+    if (!is_string($provider) || $provider === '') throw new RuntimeException('Brevo connection did not save its FluentSMTP provider.');
+    $factory = new \FluentMail\App\Services\Mailer\Providers\Factory(
+        fluentMail(), new \FluentMail\App\Models\Settings()
+    );
+    $handler = $factory->make($provider);
+    if ($provider !== 'sendinblue') throw new RuntimeException('Brevo connection did not save the FluentSMTP provider key.');
+    if (!$handler instanceof \FluentMail\App\Services\Mailer\BaseHandler) throw new RuntimeException('FluentSMTP did not resolve the Brevo provider.');
+    echo "PASS: bootstrapped Brevo provider resolves to the FluentSMTP mail handler.\n";
 } elseif ($mode === 'verify') {
     $expected = json_decode(file_get_contents('/fixture/records.json'), true);
     $order = wc_get_order($expected['order']);

@@ -45,7 +45,7 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
 ''')
     names = []
     try:
-        def start(label, port, data_dir=None):
+        def start(label, port, data_dir=None, mail=False):
             name = 'atelier-recovery-' + label + '-' + secrets.token_hex(3)
             names.append(name)
             command = ['docker', 'run', '-d', '--name', name, '-p', f'127.0.0.1:{port}:80',
@@ -53,6 +53,10 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
                 '-e', 'ATELIER_ADMIN_PASSWORD=fictional-local-password', '-e', f'ATELIER_SITE_URL=http://127.0.0.1:{port}',
                 '-v', f'{fixture}:/fixture', '-v', f'{ROOT}/tests/recovery-fixture.php:/fixture-wp.php:ro',
                 '-v', f'{ROOT}/scripts/atelier-state.php:/usr/local/lib/atelier-state.php:ro']
+            if mail:
+                command.extend(['-e', 'BREVO_API_KEY=offline-fixture-key',
+                    '-e', 'BREVO_SENDER_EMAIL=atelier-sender@example.invalid',
+                    '-e', 'BREVO_OWNER_EMAIL=atelier-owner@example.invalid'])
             if data_dir is not None:
                 command.extend(['-v', f'{data_dir}:/var/lib/atelier'])
             run(*command, IMAGE)
@@ -132,6 +136,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         interrupted = start('interrupted-swap', 18090, interrupted_disk)
         run('docker', 'exec', interrupted, 'test', '-f', '/var/lib/atelier/uploads/current/2025/kept.webp')
         print('PASS: startup restores the previous tree after an interrupted directory swap.', flush=True)
+        mailer = start('mailer', 18091, mail=True)
+        wp(mailer, 'brevo-provider')
     finally:
         for name in names:
             subprocess.run(['docker', 'rm', '-fv', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
