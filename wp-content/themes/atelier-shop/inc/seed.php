@@ -59,7 +59,7 @@ add_action('init', function () {
         wp_set_object_terms($id, [$categories[$category]], 'product_cat');
         wp_set_object_terms($id, [sanitize_title($material)], 'pa_material');
         wp_set_object_terms($id, [sanitize_title($color)], 'pa_color');
-        update_post_meta($id, '_atelier_photo', $photo);
+        update_post_meta($id, '_atelier_photo', atelier_product_photo_catalog()[$name] ?? $photo);
 
         $product = wc_get_product($id);
         $product_attributes = [];
