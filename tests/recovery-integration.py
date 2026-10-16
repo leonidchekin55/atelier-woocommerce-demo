@@ -113,6 +113,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         broken = run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', 'rev-parse', 'HEAD')
         run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'fetch', '/fixture/broken', 'HEAD')
         run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'update-ref', 'refs/heads/main', broken)
+        # On Linux, root-created Git metadata on the host bind mount is not writable by www-data.
+        run('docker', 'exec', restored, 'chown', '-R', 'www-data:www-data', '/fixture/remote.git', '/fixture/broken')
         run('docker', 'exec', '--user', 'www-data', restored, 'php', '/fixture/operation.php', 'restore', expected=1)
         wp(restored, 'unchanged')
         wp(restored, 'baseline-check')
