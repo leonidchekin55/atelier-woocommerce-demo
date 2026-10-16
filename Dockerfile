@@ -16,7 +16,7 @@ RUN curl -fsSL https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli
     && echo 'ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c  /usr/local/bin/wp' | sha256sum -c - \
     && chmod +x /usr/local/bin/wp
 
-RUN curl -fsSL https://downloads.wordpress.org/plugin/woocommerce.11.2.0.zip -o /tmp/woocommerce.zip \
+RUN curl -fsSL https://downloads.wordpress.org/plugin/woocommerce.11.2.1.zip -o /tmp/woocommerce.zip \
     && unzip -q /tmp/woocommerce.zip -d /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/woocommerce.zip
 
@@ -33,7 +33,7 @@ RUN set -eu; \
     mkdir -p /usr/src/wordpress/wp-content/languages /usr/src/wordpress/wp-content/languages/plugins; \
     curl -fsSL "$core_url" -o /tmp/core-ru.zip; \
     unzip -jo /tmp/core-ru.zip '*.mo' -d /usr/src/wordpress/wp-content/languages >/dev/null; \
-    curl -fsSL https://downloads.wordpress.org/translation/plugin/woocommerce/11.2.0/ru_RU.zip -o /tmp/woocommerce-ru.zip; \
+    curl -fsSL https://downloads.wordpress.org/translation/plugin/woocommerce/11.2.1/ru_RU.zip -o /tmp/woocommerce-ru.zip; \
     unzip -jo /tmp/woocommerce-ru.zip '*.mo' -d /usr/src/wordpress/wp-content/languages/plugins >/dev/null; \
     rm /tmp/core-ru.zip /tmp/woocommerce-ru.zip
 
