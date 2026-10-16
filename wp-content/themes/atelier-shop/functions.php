@@ -1,12 +1,20 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.9.1');
+define('ATELIER_VERSION', '1.9.2');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/media.php';
 require_once get_template_directory() . '/inc/filters.php';
 require_once get_template_directory() . '/inc/forms.php';
+
+// Modern browsers render Unicode emoji natively; skip WordPress's legacy probe.
+add_action('init', function () {
+    if (is_admin()) return;
+    remove_action('wp_head', 'print_emoji_detection_script', 7);
+    remove_action('wp_enqueue_scripts', 'wp_enqueue_emoji_styles');
+    remove_action('wp_print_styles', 'print_emoji_styles');
+}, 1);
 
 /** Make WooCommerce's transactional messages clear and consistent for the demo store. */
 function atelier_demo_email_additional_content($content) {
