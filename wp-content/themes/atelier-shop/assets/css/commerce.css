@@ -1,6 +1,3 @@
-.skip-link{position:fixed;top:8px;left:8px;z-index:100;background:var(--ink);color:white;padding:12px 18px;transform:translateY(-150%)}
-.skip-link:focus{transform:none}
-:focus-visible{outline:2px solid var(--olive);outline-offset:4px}
 .filters-open{overflow:hidden}
 .filter-reset{display:block;font-size:11px;text-decoration:underline;margin-top:16px}
 .active-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:16px 0 24px;font-size:12px}
@@ -64,9 +61,7 @@
 .woocommerce-order-overview li{padding:12px 0;font-size:11px}
 .woocommerce-order-overview strong{display:block;font-size:14px}
 @media(max-width:620px){
- .announcement{height:auto;min-height:31px}
- .menu-toggle,.filter-close,.header-actions a{min-height:44px;min-width:44px}
- .primary-nav a{min-height:44px;display:flex;align-items:center;width:100%}
+ .filter-close{min-height:44px;min-width:44px}
  .single-product .related{grid-column:auto}
  .woocommerce-cart table.shop_table_responsive thead{display:none}
  .woocommerce-cart table.shop_table_responsive tr.cart_item{display:block;position:relative;border-bottom:1px solid var(--line);padding:16px 0 16px 88px;min-height:130px}
@@ -82,4 +77,3 @@
  .woocommerce-cart .cart_totals{max-width:none;padding:20px}
  .woocommerce-cart .wc-proceed-to-checkout a.checkout-button{display:block;text-align:center}
 }
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
