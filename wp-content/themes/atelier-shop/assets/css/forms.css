@@ -9,4 +9,6 @@
 .newsletter-consent{grid-column:1/-1;display:flex;align-items:center;gap:9px;min-height:44px;color:var(--muted);font-size:9px;cursor:pointer}
 .newsletter-consent input{flex:0 0 auto;width:16px;height:16px;margin:0;accent-color:var(--olive)}
 
-.atelier-filters input[type=search]{width:100%;min-width:0;border:1px solid var(--line);padding:9px;font-size:11px;background:#fff;color:var(--ink)}
+.atelier-filters input[type=search]{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);padding:9px;font-size:11px;background:#fff;color:var(--ink)}
+
+.atelier-filters .price-inputs input,.atelier-filters>.button{min-height:44px}
