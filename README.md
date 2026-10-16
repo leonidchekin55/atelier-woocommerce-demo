@@ -6,6 +6,16 @@ An original, responsive WooCommerce storefront for a fictional independent homew
 
 Requirements: Docker Desktop with Compose. From this folder:
 
+The Docker base image, OS packages, and WP-CLI are pinned in `Dockerfile` for reproducible local builds. Pull the pinned image and build with:
+
+```sh
+docker pull wordpress:php8.3-apache@sha256:81a34254acaa6ff3b9a67268c2745e9a041c4094cbe5ccd35b75ed3bbdc033b5
+docker build --pull -t atelier-local:check .
+ATELIER_TEST_IMAGE=atelier-local:check python3 tests/recovery-integration.py
+```
+
+The same image build and disposable recovery check run in GitHub Actions for pull requests. See `AGENTS.md` for repository navigation and safety boundaries.
+
 ```sh
 docker compose up -d
 ```
