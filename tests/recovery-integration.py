@@ -113,6 +113,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         broken = run('docker', 'exec', restored, 'git', '-C', '/fixture/broken', 'rev-parse', 'HEAD')
         run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'fetch', '/fixture/broken', 'HEAD')
         run('docker', 'exec', restored, 'git', '--git-dir=/fixture/remote.git', 'update-ref', 'refs/heads/main', broken)
+        # On Linux, root-created Git metadata on the host bind mount is not writable by www-data.
+        run('docker', 'exec', restored, 'chown', '-R', 'www-data:www-data', '/fixture/remote.git', '/fixture/broken')
         run('docker', 'exec', '--user', 'www-data', restored, 'php', '/fixture/operation.php', 'restore', expected=1)
         wp(restored, 'unchanged')
         wp(restored, 'baseline-check')
@@ -139,5 +141,14 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         mailer = start('mailer', 18091, mail=True)
         wp(mailer, 'brevo-provider')
     finally:
+        # Containers write Git working trees through this host bind mount as root or www-data.
+        # Restore the caller's ownership before TemporaryDirectory removes it (GitHub's Linux
+        # runner refuses to unlink files owned by the container user).
+        owner = f'{os.getuid()}:{os.getgid()}'
+        for name in names:
+            subprocess.run(
+                ['docker', 'exec', '--user', '0:0', name, 'chown', '-R', owner, '/fixture'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+            )
         for name in names:
             subprocess.run(['docker', 'rm', '-fv', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
