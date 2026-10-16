@@ -25,6 +25,8 @@ restored before startup continues. A final isolated startup uses fictional
 Brevo settings and verifies that FluentSMTP resolves the configured provider
 and WooCommerce enables the owner notification with the configured recipient,
 without making any external email request.
+The recovery fixture also verifies the IDs and hashes of all twelve product
+images and the presence of their generated thumbnails after restoration.
 The standalone recovery checks also exercise authoritative replacement where
 existing files and folders have the opposite types from the snapshot.
 
@@ -60,6 +62,11 @@ wp eval-file tests/order-emails.php --path=/path/to/local/wordpress
 ```
 
 ## Browser and performance
+
+`wp eval-file tests/product-media.php --path=/path/to/local/wordpress` exercises
+managed-image migration, missing-source fallback, repeat runs, meaningful alt
+text and preservation of a user's replacement image. It refuses public hosts;
+run only in a disposable local store with the bundled product images present.
 
 `wp eval-file tests/price-filters.php --path=/path/to/local/wordpress` checks
 that empty price bounds are omitted while explicit zero and decimal bounds

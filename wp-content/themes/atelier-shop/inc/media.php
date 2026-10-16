@@ -1,6 +1,24 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/** Stable demo identities; product names can be edited without losing the mapping. */
+function atelier_product_photo_catalog(): array {
+    return [
+        'Sunday stoneware bowl' => 'product-sunday-bowl',
+        'Ripple serving platter' => 'product-ripple-platter',
+        'Everyday espresso cup' => 'product-espresso-cup',
+        'Gathering pitcher' => 'product-gathering-pitcher',
+        'Washed linen napkin set' => 'product-linen-napkins',
+        'Linen table runner' => 'product-linen-runner',
+        'Quiet hour cushion cover' => 'product-olive-cushion',
+        'Dawn throw' => 'product-dawn-throw',
+        'Low oak candleholder' => 'product-oak-candleholder',
+        'Handblown bud vase' => 'product-bud-vase',
+        'Arc oak tray' => 'product-arc-tray',
+        'Evening glass pair' => 'product-glass-pair',
+    ];
+}
+
 /** Responsive bundled photos; native lazy loading also works without JavaScript. */
 function atelier_editorial_image(string $photo, string $class, string $sizes, bool $priority = false): string {
     $photo = sanitize_file_name($photo);
@@ -11,8 +29,8 @@ function atelier_editorial_image(string $photo, string $class, string $sizes, bo
 }
 
 // Use real attachments so galleries, cart thumbnails and Store API agree.
-add_action('init', function () {
-    if (!class_exists('WooCommerce') || get_option('atelier_product_media_seeded')) return;
+function atelier_seed_product_media() {
+    if (!class_exists('WooCommerce') || (int)get_option('atelier_product_media_seeded') === 2) return;
     $lock_key = 'atelier_product_media_lock';
     if (!add_option($lock_key, time(), '', false)) {
         if (time() - (int)get_option($lock_key) <= 300) return;
@@ -25,11 +43,28 @@ add_action('init', function () {
         $products = wc_get_products(['limit' => -1, 'status' => 'publish']);
         $complete = true;
         $demo_count = 0;
+        $catalog = [];
+        foreach (atelier_product_photo_catalog() as $name => $filename) {
+            $catalog['AT-' . strtoupper(substr(md5($name), 0, 6))] = $filename;
+        }
         foreach ($products as $product) {
             $photo = get_post_meta($product->get_id(), '_atelier_photo', true);
             if (!$photo) continue;
             $demo_count++;
-            if ($product->get_image_id()) {
+            $target = $catalog[$product->get_sku()] ?? null;
+            $replace = false;
+            if ($target && $target !== $photo) {
+                $current = $product->get_image_id();
+                // Only replace the bundled demo photo, never a user's upload.
+                if ($current && get_post_meta($current, '_atelier_photo', true) !== $photo) continue;
+                if (!is_file(get_template_directory() . '/assets/images/' . $target . '.webp')) {
+                    $complete = false;
+                    continue;
+                }
+                $photo = $target;
+                $replace = true;
+            }
+            if ($product->get_image_id() && !$replace) {
                 $attachment_id = $product->get_image_id();
                 $destination = get_attached_file($attachment_id);
                 if (is_file($destination)) continue;
@@ -67,7 +102,7 @@ add_action('init', function () {
                     continue;
                 }
                 $attachment_id = wp_insert_attachment([
-                    'post_mime_type' => 'image/webp', 'post_title' => 'Atelier demo photograph',
+                    'post_mime_type' => 'image/webp', 'post_title' => $product->get_name() . ' — demo image',
                     'post_status' => 'inherit',
                 ], $destination, 0, true);
                 if (is_wp_error($attachment_id)) {
@@ -76,17 +111,19 @@ add_action('init', function () {
                     continue;
                 }
                 update_post_meta($attachment_id, '_atelier_photo', $photo);
-                update_post_meta($attachment_id, '_wp_attachment_image_alt', 'Atelier homeware collection');
+                update_post_meta($attachment_id, '_wp_attachment_image_alt', $product->get_name());
                 wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $destination));
             }
+            $product->update_meta_data('_atelier_photo', $photo);
             $product->set_image_id($attachment_id);
             $product->save();
         }
-        if ($complete && $demo_count >= 12) update_option('atelier_product_media_seeded', 1);
+        if ($complete && $demo_count >= 12) update_option('atelier_product_media_seeded', 2);
     } finally {
         delete_option($lock_key);
     }
-}, 105);
+}
+add_action('init', 'atelier_seed_product_media', 105);
 
 // Shared demo photos still describe the individual product to assistive tools.
 add_filter('woocommerce_gallery_image_html_attachment_image_params', function ($attributes, $attachment_id) {

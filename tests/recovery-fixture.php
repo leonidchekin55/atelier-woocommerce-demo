@@ -18,7 +18,16 @@ if ($mode === 'seed') {
     $attachment = wp_insert_attachment(['post_mime_type' => 'image/webp', 'post_title' => 'New recovery upload', 'post_status' => 'inherit'], $path);
     wp_update_attachment_metadata($attachment, wp_generate_attachment_metadata($attachment, $path));
     update_option('atelier_recovery_fixture', 'recovery-roundtrip');
-    file_put_contents('/fixture/records.json', json_encode(['order' => $order->get_id(), 'total' => $order->get_total(), 'message' => $message, 'subscriber' => $subscriber, 'attachment' => $attachment, 'hash' => hash_file('sha256', $path)]));
+    $product_images = [];
+    foreach (wc_get_products(['limit'=>-1, 'status'=>'publish']) as $product) {
+        if (!str_starts_with(get_post_meta($product->get_id(), '_atelier_photo', true), 'product-')) continue;
+        $image = $product->get_image_id();
+        $file = get_attached_file($image);
+        if (!$image || !is_file($file)) throw new RuntimeException('Bundled product image is missing.');
+        $product_images[$product->get_id()] = ['image'=>$image, 'hash'=>hash_file('sha256', $file)];
+    }
+    if (count($product_images) !== 12) throw new RuntimeException('Expected twelve managed product images.');
+    file_put_contents('/fixture/records.json', json_encode(['order' => $order->get_id(), 'total' => $order->get_total(), 'message' => $message, 'subscriber' => $subscriber, 'attachment' => $attachment, 'hash' => hash_file('sha256', $path), 'product_images'=>$product_images]));
     echo "Fictional order, message, subscriber and new upload created.\n";
 } elseif ($mode === 'unchanged') {
     if (get_option('atelier_recovery_fixture') === 'recovery-roundtrip') throw new RuntimeException('Failed restore unexpectedly imported the database.');
@@ -57,5 +66,15 @@ if ($mode === 'seed') {
     foreach (wp_get_attachment_metadata($expected['attachment'])['sizes'] ?? [] as $size) {
         if (!is_file(dirname($path) . '/' . $size['file'])) throw new RuntimeException('Generated image size was not restored.');
     }
+    foreach ($expected['product_images'] as $id => $record) {
+        $product = wc_get_product($id);
+        $file = get_attached_file($record['image']);
+        if (!$product || (int)$product->get_image_id() !== (int)$record['image'] || !is_file($file)
+            || hash_file('sha256', $file) !== $record['hash']) throw new RuntimeException('Product image did not recover.');
+        foreach (wp_get_attachment_metadata($record['image'])['sizes'] ?? [] as $size) {
+            if (!is_file(dirname($file) . '/' . $size['file'])) throw new RuntimeException('Product thumbnail did not recover.');
+        }
+    }
+    echo "PASS: twelve product images and thumbnails restored with matching IDs and hashes.\n";
     echo "PASS: order ID/status/items/total, private message/subscriber, new upload and image sizes restored.\n";
 } else throw new RuntimeException('Unknown fixture operation.');
