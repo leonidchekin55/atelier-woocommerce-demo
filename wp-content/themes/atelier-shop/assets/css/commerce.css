@@ -10,6 +10,13 @@
 .active-filter:hover{background:var(--paper)}
 .active-filter span{font-size:18px;flex-shrink:0}
 .active-filters-reset{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline}
+.woocommerce-pagination{margin:32px 0}
+.woocommerce-pagination ul.page-numbers{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0}
+.woocommerce-pagination ul.page-numbers li{margin:0;padding:0}
+.woocommerce-pagination a.page-numbers,.woocommerce-pagination span.page-numbers{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px 12px;border:1px solid var(--line);font-size:14px;line-height:1.4;text-decoration:none}
+.woocommerce-pagination a.page-numbers:hover{background:var(--paper);border-color:var(--olive)}
+.woocommerce-pagination .page-numbers.current{background:var(--ink);border-color:var(--ink);color:white}
+.woocommerce-pagination a.page-numbers:focus-visible{outline:2px solid var(--olive);outline-offset:3px}
 .single-product div.product>*{min-width:0}
 .single-product .woocommerce-product-gallery{position:relative;align-self:start;overflow:hidden}
 .single-product .woocommerce-product-gallery__wrapper{margin:0}
