@@ -139,5 +139,14 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         mailer = start('mailer', 18091, mail=True)
         wp(mailer, 'brevo-provider')
     finally:
+        # Containers write Git working trees through this host bind mount as root or www-data.
+        # Restore the caller's ownership before TemporaryDirectory removes it (GitHub's Linux
+        # runner refuses to unlink files owned by the container user).
+        owner = f'{os.getuid()}:{os.getgid()}'
+        for name in names:
+            subprocess.run(
+                ['docker', 'exec', '--user', '0:0', name, 'chown', '-R', owner, '/fixture'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+            )
         for name in names:
             subprocess.run(['docker', 'rm', '-fv', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
