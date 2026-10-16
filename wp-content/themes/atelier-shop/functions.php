@@ -124,6 +124,13 @@ add_filter('get_canonical_url', function ($url) {
 add_action('wp_head', function () {
     if (is_admin() || is_feed() || is_embed()) return;
 
+    // The homepage hero is the largest visible image; expose it before the
+    // browser reaches the body so it can begin downloading alongside the CSS.
+    if (is_front_page()) {
+        $hero = get_template_directory_uri() . '/assets/images/photo-1616486338812-3dadae4b4ace';
+        echo '<link rel="preload" as="image" href="' . esc_url($hero . '-wide.webp') . '" imagesrcset="' . esc_attr($hero . '.webp 1000w, ' . $hero . '-wide.webp 1800w') . '" imagesizes="100vw" type="image/webp" fetchpriority="high">' . "\n";
+    }
+
     echo '<meta name="google-site-verification" content="8rv9o11ZOkUG51YwiTQ2jvBnVUAd4H8wSRHlqW1_f64">' . "\n";
 
     $is_product = function_exists('is_product') && is_product();
