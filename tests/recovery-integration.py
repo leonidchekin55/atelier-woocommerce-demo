@@ -13,8 +13,8 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = os.environ.get('ATELIER_TEST_IMAGE', 'atelier-gsc-verification:latest')
 
-def run(*command, expected=0):
-    result = subprocess.run(command, capture_output=True, text=True)
+def run(*command, expected=0, timeout=300):
+    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
     if result.returncode != expected:
         raise RuntimeError(f'{command[0]} failed with exit {result.returncode}; diagnostics suppressed.')
     return result.stdout.strip()
@@ -37,6 +37,19 @@ require_once '/usr/local/lib/atelier-state.php';
 try {
     if (($argv[1] ?? '') === 'save') Atelier_State::save();
     elseif (($argv[1] ?? '') === 'bad-sql') file_put_contents('/fixture/broken/state.enc', Atelier_State::encrypt("UPDATE wp_options SET option_value='partially-imported' WHERE option_name='atelier_recovery_fixture';\nTHIS IS NOT VALID SQL;\n"));
+    elseif (($argv[1] ?? '') === 'pipe-stress') {
+        $child = 'fwrite(STDOUT, str_repeat("o", 262144)); fwrite(STDERR, str_repeat("e", 262144)); $input = stream_get_contents(STDIN); exit(strlen($input) === 2097152 ? 0 : 3);';
+        $run = new ReflectionMethod(Atelier_State::class, 'run');
+        $run->setAccessible(true);
+        $output = $run->invoke(null, [PHP_BINARY, '-r', $child], str_repeat('i', 2097152));
+        if (strlen($output) !== 262144) throw new RuntimeException('Recovery command output was incomplete.');
+        file_put_contents('/fixture/pipe-input.bin', str_repeat('i', 2097152));
+        $runFile = new ReflectionMethod(Atelier_State::class, 'runFile');
+        $runFile->setAccessible(true);
+        $output = $runFile->invoke(null, [PHP_BINARY, '-r', $child], '/fixture/pipe-input.bin');
+        if (strlen($output) !== 262144) throw new RuntimeException('Recovery file command output was incomplete.');
+        echo "Pipe stress checks passed.\\n";
+    }
     elseif (($argv[1] ?? '') === 'status') { echo json_encode(Atelier_State::status()); exit(0); }
     else Atelier_State::sync();
     echo "Recovery operation completed.\\n";
@@ -71,6 +84,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         def wp(name, mode):
             print(run('docker', 'exec', name, 'wp', 'eval-file', '/fixture-wp.php', mode, '--path=/var/www/html', '--allow-root'), flush=True)
         donor = start('donor', 18087)
+        run('docker', 'exec', donor, 'timeout', '20s', 'php', '/fixture/operation.php', 'pipe-stress', timeout=25)
+        print('PASS: recovery commands drain stdout/stderr while piping string and file input.', flush=True)
         run('docker', 'exec', donor, 'git', 'init', '--bare', '-b', 'main', '/fixture/remote.git')
         wp(donor, 'seed')
         run('docker', 'exec', donor, 'php', '/fixture/operation.php', 'save')
