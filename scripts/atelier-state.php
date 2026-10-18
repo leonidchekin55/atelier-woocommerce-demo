@@ -33,37 +33,79 @@ final class Atelier_State {
     private static function run(array $command, ?string $input = null, ?string $cwd = null): string {
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
         if (!is_resource($process)) throw new RuntimeException('Recovery operation could not start.');
-        if ($input !== null) {
-            $offset = 0;
-            while ($offset < strlen($input)) {
-                $written = fwrite($pipes[0], substr($input, $offset, 65536));
-                if ($written === false || $written === 0) { fclose($pipes[0]); proc_terminate($process); throw new RuntimeException('Recovery input failed.'); }
-                $offset += $written;
+        return self::exchange($process, $pipes, $input);
+    }
+    private static function exchange($process, array $pipes, ?string $input = null, $inputStream = null): string {
+        foreach ($pipes as $pipe) stream_set_blocking($pipe, false);
+        $offset = 0;
+        $pending = '';
+        $output = '';
+        $inputOpen = true;
+        try {
+            while ($inputOpen || !feof($pipes[1]) || !feof($pipes[2])) {
+                if ($inputOpen && $pending === '') {
+                    if (is_resource($inputStream)) {
+                        $chunk = fread($inputStream, 65536);
+                        if ($chunk === false) throw new RuntimeException('Recovery input failed.');
+                        if ($chunk === '' && feof($inputStream)) {
+                            fclose($pipes[0]);
+                            $inputOpen = false;
+                        } else {
+                            $pending = $chunk;
+                        }
+                    } elseif ($input !== null && $offset < strlen($input)) {
+                        $pending = substr($input, $offset, 65536);
+                    } else {
+                        fclose($pipes[0]);
+                        $inputOpen = false;
+                    }
+                }
+
+                $read = [];
+                if (!feof($pipes[1])) $read[] = $pipes[1];
+                if (!feof($pipes[2])) $read[] = $pipes[2];
+                $write = $pending !== '' ? [$pipes[0]] : [];
+                if ($read === [] && $write === []) break;
+                $except = null;
+                if (stream_select($read, $write, $except, 1) === false) {
+                    throw new RuntimeException('Recovery operation failed.');
+                }
+
+                foreach ($read as $pipe) {
+                    $chunk = fread($pipe, 65536);
+                    if ($chunk === false) throw new RuntimeException('Recovery operation failed.');
+                    if ($pipe === $pipes[1]) $output .= $chunk;
+                    // Discard diagnostics: SQL errors can contain personal data.
+                }
+                foreach ($write as $pipe) {
+                    $written = fwrite($pipe, $pending);
+                    if ($written === false) throw new RuntimeException('Recovery input failed.');
+                    if ($written > 0) {
+                        $pending = substr($pending, $written);
+                        if ($inputStream === null) $offset += $written;
+                    }
+                }
             }
+            fclose($pipes[1]); fclose($pipes[2]);
+            if (proc_close($process) !== 0) throw new RuntimeException('Recovery operation failed.');
+            return trim($output);
+        } catch (Throwable $error) {
+            if (is_resource($process)) proc_terminate($process);
+            foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+            if (is_resource($process)) proc_close($process);
+            throw $error;
         }
-        fclose($pipes[0]);
-        $output = stream_get_contents($pipes[1]);
-        stream_get_contents($pipes[2]); // Discard diagnostics: SQL errors can contain personal data.
-        fclose($pipes[1]); fclose($pipes[2]);
-        if (proc_close($process) !== 0) throw new RuntimeException('Recovery operation failed.');
-        return trim($output);
     }
     private static function runFile(array $command, string $path): string {
-        $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if (!is_resource($process)) throw new RuntimeException('Recovery operation could not start.');
         $input = fopen($path, 'rb');
-        if (!$input) {
-            fclose($pipes[0]); stream_get_contents($pipes[1]); stream_get_contents($pipes[2]);
-            fclose($pipes[1]); fclose($pipes[2]); proc_terminate($process); proc_close($process);
-            throw new RuntimeException('Recovery input could not be read.');
+        if (!$input) throw new RuntimeException('Recovery input could not be read.');
+        try {
+            $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (!is_resource($process)) throw new RuntimeException('Recovery operation could not start.');
+            return self::exchange($process, $pipes, null, $input);
+        } finally {
+            fclose($input);
         }
-        $copied = stream_copy_to_stream($input, $pipes[0]);
-        fclose($input);
-        fclose($pipes[0]);
-        $output = stream_get_contents($pipes[1]); stream_get_contents($pipes[2]);
-        fclose($pipes[1]); fclose($pipes[2]);
-        if ($copied === false || proc_close($process) !== 0) throw new RuntimeException('Recovery operation failed.');
-        return trim($output);
     }
     private static function key(): string {
         $key = base64_decode(getenv('ATELIER_STATE_KEY') ?: '', true);
