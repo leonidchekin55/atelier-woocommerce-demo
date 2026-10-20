@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const russian = document.documentElement.lang.startsWith('ru');
+  const labels = russian
+    ? { filters: 'Фильтры товаров', closeMenu: 'Закрыть меню', openMenu: 'Открыть меню' }
+    : { filters: 'Filter products', closeMenu: 'Close menu', openMenu: 'Open menu' };
   const toggle = document.querySelector('.filter-toggle');
   const sidebar = document.querySelector('.shop-sidebar');
   const scrim = document.querySelector('.filter-scrim');
@@ -17,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (open) {
       sidebar.setAttribute('role', 'dialog');
       sidebar.setAttribute('aria-modal', 'true');
-      sidebar.setAttribute('aria-label', 'Filter products');
+      sidebar.setAttribute('aria-label', labels.filters);
       background.forEach(element => { element.inert = true; });
       sidebar.querySelector('input, button, select')?.focus();
     }
@@ -53,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const setMenu = (open) => {
     nav?.classList.toggle('is-open', open);
     menu?.setAttribute('aria-expanded', String(open));
-    menu?.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    menu?.setAttribute('aria-label', open ? labels.closeMenu : labels.openMenu);
   };
   menu?.addEventListener('click', () => {
     setMenu(!nav?.classList.contains('is-open'));

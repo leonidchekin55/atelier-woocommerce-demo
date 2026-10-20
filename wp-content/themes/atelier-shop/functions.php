@@ -1,12 +1,69 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-define('ATELIER_VERSION', '1.6.0');
+define('ATELIER_VERSION', '1.9.2');
 require_once get_template_directory() . '/inc/setup.php';
 require_once get_template_directory() . '/inc/seed.php';
 require_once get_template_directory() . '/inc/media.php';
 require_once get_template_directory() . '/inc/filters.php';
 require_once get_template_directory() . '/inc/forms.php';
+
+// Modern browsers render Unicode emoji natively; skip WordPress's legacy probe.
+add_action('init', function () {
+    if (is_admin()) return;
+    remove_action('wp_head', 'print_emoji_detection_script', 7);
+    remove_action('wp_enqueue_scripts', 'wp_enqueue_emoji_styles');
+    remove_action('wp_print_styles', 'print_emoji_styles');
+}, 1);
+
+/** Make WooCommerce's transactional messages clear and consistent for the demo store. */
+function atelier_demo_email_additional_content($content) {
+    $message = current_filter();
+    $email_id = str_replace('woocommerce_email_additional_content_', '', $message);
+    $messages = [
+        'new_order' => 'Atelier Home demo notice: this order was placed for demonstration. No payment or fulfillment is required.',
+        'cancelled_order' => 'Atelier Home demo notice: this order was cancelled in the demonstration store. No payment or fulfillment is required.',
+        'customer_cancelled_order' => 'This was a demonstration order. It has been cancelled; no payment was collected and nothing will be shipped.',
+        'customer_processing_order' => 'This is a demonstration order. No payment will be collected and no items will be shipped. You can continue exploring the store below.',
+        'customer_completed_order' => 'This demonstration order has been marked complete. No payment was collected and no items were shipped. Thank you for trying Atelier Home.',
+        'customer_on_hold_order' => 'This is a demonstration order. No payment will be collected and no items will be shipped.',
+    ];
+
+    if (!isset($messages[$email_id])) return $content;
+
+    $demo_note = $messages[$email_id] . "\n\nExplore Atelier Home: " . home_url('/');
+    return trim((string) $content) === '' ? $demo_note : rtrim((string) $content) . "\n\n" . $demo_note;
+}
+
+add_filter('woocommerce_email_footer_text', function ($text) {
+    return 'Atelier Home — demo store. Orders are for demonstration only; no payment or fulfillment is processed. {site_url}';
+});
+
+add_filter('woocommerce_email_from_name', function ($name) {
+    return 'Atelier Home (Demo)';
+});
+
+foreach ([
+    'new_order' => 'New demo order',
+    'cancelled_order' => 'Demo order cancelled',
+    'customer_cancelled_order' => 'Your demo order was cancelled',
+    'customer_processing_order' => 'Your Atelier Home demo order',
+    'customer_completed_order' => 'Your Atelier Home demo order is complete',
+    'customer_on_hold_order' => 'Your Atelier Home demo order',
+] as $email_id => $heading) {
+    add_filter('woocommerce_email_additional_content_' . $email_id, 'atelier_demo_email_additional_content', 10, 3);
+    add_filter('woocommerce_email_heading_' . $email_id, static function ($current) use ($heading) { return $heading; });
+    add_filter('woocommerce_email_subject_' . $email_id, static function ($current) { return 'Atelier Home demo — ' . $current; });
+}
+
+add_filter('woocommerce_email_styles', function ($css) {
+    return $css . "\n/* Atelier Home: keep transactional email content readable on narrow screens. */\n"
+        . '#template_container{width:100%!important;max-width:600px!important}'
+        . '#template_body,#body_content{width:100%!important}'
+        . '#body_content_inner{font-size:15px!important;line-height:1.65!important}'
+        . '#body_content a{overflow-wrap:anywhere}'
+        . '@media only screen and (max-width:600px){#template_container{width:100%!important}#body_content_inner{padding:20px 16px!important;font-size:14px!important}#header_wrapper{padding:22px 16px!important}}';
+});
 
 /** Give search and social previews useful, page-specific metadata without a plugin. */
 function atelier_seo_description(): string {
@@ -75,6 +132,13 @@ add_filter('get_canonical_url', function ($url) {
 add_action('wp_head', function () {
     if (is_admin() || is_feed() || is_embed()) return;
 
+    // The homepage hero is the largest visible image; expose it before the
+    // browser reaches the body so it can begin downloading alongside the CSS.
+    if (is_front_page()) {
+        $hero = get_template_directory_uri() . '/assets/images/photo-1616486338812-3dadae4b4ace';
+        echo '<link rel="preload" as="image" href="' . esc_url($hero . '-wide.webp') . '" imagesrcset="' . esc_attr($hero . '.webp 1000w, ' . $hero . '-wide.webp 1800w') . '" imagesizes="100vw" type="image/webp" fetchpriority="high">' . "\n";
+    }
+
     echo '<meta name="google-site-verification" content="8rv9o11ZOkUG51YwiTQ2jvBnVUAd4H8wSRHlqW1_f64">' . "\n";
 
     $is_product = function_exists('is_product') && is_product();
@@ -123,7 +187,9 @@ add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('atelier-main', get_template_directory_uri() . '/assets/css/main.css', ['atelier-style'], ATELIER_VERSION);
     wp_enqueue_style('atelier-editorial', get_template_directory_uri() . '/assets/css/editorial.css', ['atelier-main'], ATELIER_VERSION);
     wp_enqueue_style('atelier-forms', get_template_directory_uri() . '/assets/css/forms.css', ['atelier-editorial'], ATELIER_VERSION);
-    wp_enqueue_style('atelier-commerce', get_template_directory_uri() . '/assets/css/commerce.css', ['atelier-forms'], ATELIER_VERSION);
+    if (function_exists('is_woocommerce') && (is_woocommerce() || is_cart() || is_checkout() || is_account_page())) {
+        wp_enqueue_style('atelier-commerce', get_template_directory_uri() . '/assets/css/commerce.css', ['atelier-forms'], ATELIER_VERSION);
+    }
     wp_enqueue_script('atelier-main', get_template_directory_uri() . '/assets/js/main.js', [], ATELIER_VERSION, true);
 });
 

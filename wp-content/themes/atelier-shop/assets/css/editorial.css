@@ -2,3 +2,6 @@
 .journal-read-more>summary{display:inline-block;list-style:none;cursor:pointer}
 .journal-read-more>summary::-webkit-details-marker{display:none}
 .journal-read-more>div{padding-top:8px;color:var(--muted);font-size:12px}
+
+.editorial-hero>div{min-width:0;max-width:100%}
+@media(max-width:620px){.editorial-hero h1{font-size:clamp(40px,13vw,61px);overflow-wrap:break-word}}
