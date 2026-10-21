@@ -3,6 +3,19 @@ set -Eeuo pipefail
 
 DATA_DIR=/var/lib/atelier
 mkdir -p "$DATA_DIR/mysql" "$DATA_DIR/uploads" /run/mysqld
+# A process may stop between renaming the old uploads tree and installing its
+# prepared replacement. Restore the retained old tree before creating a blank one.
+if [[ ! -e "$DATA_DIR/uploads/current" && ! -L "$DATA_DIR/uploads/current" ]]; then
+  shopt -s nullglob
+  for backup in "$DATA_DIR/uploads"/.atelier-previous-*; do
+    if [[ -d "$backup" && ! -L "$backup" ]]; then
+      mv "$backup" "$DATA_DIR/uploads/current"
+      break
+    fi
+  done
+  shopt -u nullglob
+fi
+mkdir -p "$DATA_DIR/uploads/current"
 chown -R mysql:mysql /run/mysqld "$DATA_DIR/mysql"
 chown -R www-data:www-data "$DATA_DIR/uploads"
 
@@ -37,6 +50,7 @@ then
 fi
 unset db_password
 
+recovery_ready=0
 if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
   if php /usr/local/lib/atelier-state.php restore; then
     recovery_ready=1
@@ -55,12 +69,64 @@ if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
   fi
 fi
 
+# Legacy uploads must not be merged over a verified snapshot: the snapshot is
+# the authoritative file set and may intentionally exclude old/deleted files.
+# If recovery is not configured or the remote is still empty, copy the legacy
+# tree once and resume safely after interruption, preserving current files.
+legacy_migration_marker="$DATA_DIR/uploads/.atelier-legacy-uploads-migrated"
+legacy_migration_in_progress="$DATA_DIR/uploads/.atelier-legacy-uploads-in-progress"
+for marker in "$legacy_migration_marker" "$legacy_migration_in_progress"; do
+  if [[ -L "$marker" || ( -e "$marker" && ! -f "$marker" ) ]]; then
+    echo 'Legacy uploads migration marker must be a regular file.' >&2
+    exit 1
+  fi
+done
+if [[ -f "$legacy_migration_marker" && -f "$legacy_migration_in_progress" ]]; then
+  rm "$legacy_migration_in_progress"
+fi
+if [[ ! -f "$legacy_migration_marker" ]]; then
+  if (( recovery_ready )); then
+    touch "$legacy_migration_marker"
+  else
+    if [[ ! -f "$legacy_migration_in_progress" ]]; then
+      touch "$legacy_migration_in_progress"
+    fi
+    copy_legacy_upload() {
+      local source_path="$1" destination_path="$2" child
+      if [[ -L "$source_path" || ! -d "$source_path" ]]; then
+        if [[ ! -e "$destination_path" && ! -L "$destination_path" ]]; then
+          cp -a "$source_path" "$destination_path"
+        fi
+        return 0
+      fi
+      if [[ -e "$destination_path" || -L "$destination_path" ]]; then
+        if [[ -L "$destination_path" || ! -d "$destination_path" ]]; then return 0; fi
+        for child in "$source_path"/*; do
+          copy_legacy_upload "$child" "$destination_path/$(basename "$child")"
+        done
+        return 0
+      fi
+      cp -a "$source_path" "$destination_path"
+    }
+
+    shopt -s dotglob nullglob
+    for item in "$DATA_DIR/uploads"/*; do
+      [[ "$item" == "$DATA_DIR/uploads/current" ]] && continue
+      [[ "$(basename "$item")" == .atelier-* ]] && continue
+      copy_legacy_upload "$item" "$DATA_DIR/uploads/current/$(basename "$item")"
+    done
+    shopt -u dotglob nullglob
+  fi
+  touch "$legacy_migration_marker"
+  if [[ -f "$legacy_migration_in_progress" ]]; then rm "$legacy_migration_in_progress"; fi
+fi
+
 mkdir -p /var/www/html/wp-content/uploads
 if [ -d /var/www/html/wp-content/uploads ] && [ ! -L /var/www/html/wp-content/uploads ]; then
-  cp -a /var/www/html/wp-content/uploads/. "$DATA_DIR/uploads/"
+  cp -a /var/www/html/wp-content/uploads/. "$DATA_DIR/uploads/current/"
   rm -rf /var/www/html/wp-content/uploads
 fi
-ln -sfn "$DATA_DIR/uploads" /var/www/html/wp-content/uploads
+ln -sfn "$DATA_DIR/uploads/current" /var/www/html/wp-content/uploads
 chown -R www-data:www-data "$DATA_DIR/uploads"
 
 # Render Free can discard its container filesystem when the service spins down
@@ -124,6 +190,41 @@ EOF
   wp eval 'update_option("active_plugins", array_values(array_filter((array)get_option("active_plugins"), function ($plugin) { return !preg_match("~^atelier-(export|bridge|hold)-plugin/~", $plugin); })));' "${wp_args[@]}" >/dev/null
   wp plugin is-active woocommerce "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate woocommerce "${wp_args[@]}"
   wp theme is-active atelier-shop "${wp_args[@]}" >/dev/null 2>&1 || wp theme activate atelier-shop "${wp_args[@]}"
+  if [[ -n "${BREVO_API_KEY:-}" && -n "${BREVO_SENDER_EMAIL:-}" && -n "${BREVO_OWNER_EMAIL:-}" ]]; then
+    wp plugin is-installed fluent-smtp "${wp_args[@]}" || { echo 'FluentSMTP is missing from the image.' >&2; exit 1; }
+    wp plugin is-active fluent-smtp "${wp_args[@]}" >/dev/null 2>&1 || wp plugin activate fluent-smtp "${wp_args[@]}"
+    wp eval '
+      $email = sanitize_email(getenv("BREVO_SENDER_EMAIL"));
+      if (!is_email($email) || !defined("FLUENTMAIL_SENDINBLUE_API_KEY") || !FLUENTMAIL_SENDINBLUE_API_KEY) { throw new RuntimeException("Brevo mail configuration is incomplete."); }
+      $owner = sanitize_email(getenv("BREVO_OWNER_EMAIL"));
+      if (!is_email($owner)) { throw new RuntimeException("Brevo owner email is invalid."); }
+      $key = md5($email);
+      $settings = fluentMailGetSettings();
+      $settings["connections"][$key] = ["title" => "Sendinblue", "provider_settings" => ["provider" => "sendinblue", "sender_name" => "Atelier", "sender_email" => $email, "force_from_name" => "yes", "key_store" => "wp_config", "api_key" => ""]];
+      $settings["mappings"][$email] = $key;
+      $settings["misc"]["default_connection"] = $key;
+      // WordPress returns false when an option already has the requested value.
+      fluentMailSetSettings($settings);
+      $saved = fluentMailGetSettings([], false);
+      if (($saved["connections"][$key] ?? null) !== $settings["connections"][$key]
+        || ($saved["mappings"][$email] ?? null) !== $key
+        || ($saved["misc"]["default_connection"] ?? null) !== $key) {
+        throw new RuntimeException("Could not save FluentSMTP settings.");
+      }
+      $newOrderSettings = get_option("woocommerce_new_order_settings", []);
+      if (!is_array($newOrderSettings)) { $newOrderSettings = []; }
+      $newOrderSettings["enabled"] = "yes";
+      $newOrderSettings["recipient"] = $owner;
+      update_option("woocommerce_new_order_settings", $newOrderSettings);
+      $savedNewOrderSettings = get_option("woocommerce_new_order_settings", []);
+      if (($savedNewOrderSettings["enabled"] ?? "") !== "yes"
+        || ($savedNewOrderSettings["recipient"] ?? "") !== $owner) {
+        throw new RuntimeException("Could not save WooCommerce new-order email settings.");
+      }
+    ' "${wp_args[@]}" >/dev/null
+  else
+    wp plugin is-active fluent-smtp "${wp_args[@]}" >/dev/null 2>&1 && wp plugin deactivate fluent-smtp "${wp_args[@]}" >/dev/null
+  fi
   wp option update home "$site_url" "${wp_args[@]}" >/dev/null
   wp option update siteurl "$site_url" "${wp_args[@]}" >/dev/null
   if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then

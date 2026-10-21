@@ -6,6 +6,16 @@ An original, responsive WooCommerce storefront for a fictional independent homew
 
 Requirements: Docker Desktop with Compose. From this folder:
 
+The Docker base image digest, selected OS package versions, and WP-CLI release are pinned in `Dockerfile` to reduce accidental build drift. Other upstream downloads are versioned in the Dockerfile but are not vendored. Build and run the disposable recovery check with:
+
+```sh
+docker pull wordpress:php8.3-apache@sha256:81a34254acaa6ff3b9a67268c2745e9a041c4094cbe5ccd35b75ed3bbdc033b5
+docker build --pull -t atelier-local:check .
+ATELIER_TEST_IMAGE=atelier-local:check python3 tests/recovery-integration.py
+```
+
+The same image build and disposable recovery check run in GitHub Actions for pull requests. See `AGENTS.md` for repository navigation and safety boundaries.
+
 ```sh
 docker compose up -d
 ```
@@ -26,7 +36,8 @@ To stop: `docker compose down`. To erase the local database and uploads as well:
 - Page-specific search descriptions and Open Graph/Twitter previews, crawlable English/Russian URLs with canonical and `hreflang` links, and a clean sitemap. Anonymous visitors cannot enumerate WordPress user profiles through REST or author archives.
 - One-time sample catalog and demo checkout provisioning, including US shipping methods.
 - Private WordPress inbox and newsletter list with consent, nonce checks and spam honeypot fields. Form submissions are stored in wp-admin; this demo does not send email.
-- Product and editorial photos are bundled as optimized WebP assets under the [Unsplash License](https://unsplash.com/license). DM Sans and Playfair Display are self-hosted, with their SIL Open Font License texts included in `assets/fonts`.
+- The twelve `product-*.webp` images are AI-generated illustrations of the fictional demo products, rather than photographs of inventory. Existing editorial photographs remain bundled under the [Unsplash License](https://unsplash.com/license). All images are optimized WebP. DM Sans and Playfair Display are self-hosted, with their SIL Open Font License texts included in `assets/fonts`.
+- Media migration replaces only managed demo images, matched by stable SKU. User uploads and previous attachments are preserved. Generated thumbnails and originals remain part of encrypted recovery.
 - Docker Compose with MariaDB and persistent local volumes.
 
 All brand names, products, prices and copy are fictional demo content. Replace them before any public launch.

@@ -10,7 +10,7 @@ The published demo uses a private GitHub repository containing encrypted databas
 - Bundled catalog photographs: the bootstrap reconstructs missing files while preserving attachment IDs.
 - Arbitrary files in `wp-content/uploads`, including user-uploaded product photos.
 
-Arbitrary uploaded files are **not** stored in the database snapshot. Keep a separate media backup before adding original uploads. This setup uses one instance and is unsuitable for a busy or production shop.
+Uploaded files are stored in the separate encrypted `media.enc` archive in the same snapshot commit as the database. Both archives are required for restore. Keep an independent backup of originals as well. This setup uses one instance and is unsuitable for a busy or production shop.
 
 ## Write and restore protocol
 
