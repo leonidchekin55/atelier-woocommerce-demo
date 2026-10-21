@@ -37,6 +37,28 @@ if ($mode === 'seed') {
 } elseif ($mode === 'baseline-check') {
     if (get_option('atelier_recovery_fixture') !== 'before-invalid-import') throw new RuntimeException('Partial SQL import was not rolled back.');
     echo "Partial SQL import was rolled back.\n";
+} elseif ($mode === 'commerce-search') {
+    global $wp_query;
+    $original_query = $wp_query;
+    try {
+        $wp_query = new WP_Query();
+        $wp_query->is_search = true;
+        $wp_query->query_vars['post_type'] = 'product';
+        if (!atelier_is_commerce_context()) throw new RuntimeException('Product search was not detected as a commerce page.');
+        do_action('wp_enqueue_scripts');
+        if (!wp_style_is('atelier-commerce', 'enqueued')) throw new RuntimeException('Product search did not enqueue commerce styles.');
+        if (!in_array('atelier-commerce', apply_filters('body_class', []), true)) throw new RuntimeException('Product search is missing the commerce body class.');
+
+        wp_dequeue_style('atelier-commerce');
+        $wp_query->query_vars['post_type'] = 'post';
+        if (atelier_is_commerce_context()) throw new RuntimeException('A regular post search was treated as a product search.');
+        do_action('wp_enqueue_scripts');
+        if (wp_style_is('atelier-commerce', 'enqueued')) throw new RuntimeException('A regular post search enqueued commerce styles.');
+        if (in_array('atelier-commerce', apply_filters('body_class', []), true)) throw new RuntimeException('A regular post search received the commerce body class.');
+    } finally {
+        $wp_query = $original_query;
+    }
+    echo "PASS: commerce styles and body class are scoped to product searches.\n";
 } elseif ($mode === 'brevo-provider') {
     $sender = 'atelier-sender@example.invalid';
     $connectionKey = md5($sender);
