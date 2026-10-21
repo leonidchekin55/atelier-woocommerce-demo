@@ -13,16 +13,20 @@ docker build -t atelier-audit-improved:latest .
 ATELIER_TEST_IMAGE=atelier-audit-improved:latest python3 tests/recovery-integration.py
 ```
 
-Requires Docker and Python 3; ports 18087–18091 must be free. The test replaces
+Requires Docker and Python 3; ports 18087–18093 must be free. The test replaces
 the entire donor container/database and removes all containers and temporary
 recovery data afterward. It verifies a native WooCommerce order, private inbox
 message/subscriber, newly uploaded attachment and generated thumbnails, refusal
-of missing/corrupt media or a symlink in uploads before SQL import, migration of
-files from the previous persistent-disk uploads path, and startup recovery of
-the old tree after an interrupted directory swap. It also applies a valid
-database change followed by invalid SQL and checks that the previous value is
-restored before startup continues. A final isolated startup uses fictional
-Brevo settings and verifies that FluentSMTP resolves the configured provider
+of missing/corrupt media or a symlink in uploads before SQL import, one-time
+migration of files from the previous persistent-disk uploads path (including
+restart checks proving deleted legacy files stay deleted and interrupted
+migrations resume without overwriting newer files), startup recovery of the old
+tree after an interrupted directory swap, and an upgrade check that avoids
+re-importing stale legacy files if `current` already existed. It verifies that
+product searches enqueue commerce styles without styling regular post searches. It
+also applies a valid database change followed by invalid SQL and checks that
+the previous value is restored before startup continues. A final isolated
+startup uses fictional Brevo settings and verifies that FluentSMTP resolves the configured provider
 and WooCommerce enables the owner notification with the configured recipient,
 without making any external email request.
 The recovery fixture also verifies the IDs and hashes of all twelve product

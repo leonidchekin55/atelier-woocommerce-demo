@@ -181,20 +181,29 @@ add_filter('option_blogdescription', function ($description) {
         : 'Thoughtful homeware for a slower home: handmade ceramics, natural textiles and everyday objects.';
 });
 
+function atelier_is_commerce_context(): bool {
+    if (!function_exists('is_woocommerce')) return false;
+
+    $post_types = (array) get_query_var('post_type');
+    $is_product_search = function_exists('is_search') && is_search() && in_array('product', $post_types, true);
+
+    return is_woocommerce() || is_cart() || is_checkout() || is_account_page() || $is_product_search;
+}
+
 add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('atelier-fonts', get_template_directory_uri() . '/assets/css/fonts.css', [], ATELIER_VERSION);
     wp_enqueue_style('atelier-style', get_stylesheet_uri(), [], ATELIER_VERSION);
     wp_enqueue_style('atelier-main', get_template_directory_uri() . '/assets/css/main.css', ['atelier-style'], ATELIER_VERSION);
     wp_enqueue_style('atelier-editorial', get_template_directory_uri() . '/assets/css/editorial.css', ['atelier-main'], ATELIER_VERSION);
     wp_enqueue_style('atelier-forms', get_template_directory_uri() . '/assets/css/forms.css', ['atelier-editorial'], ATELIER_VERSION);
-    if (function_exists('is_woocommerce') && (is_woocommerce() || is_cart() || is_checkout() || is_account_page())) {
+    if (atelier_is_commerce_context()) {
         wp_enqueue_style('atelier-commerce', get_template_directory_uri() . '/assets/css/commerce.css', ['atelier-forms'], ATELIER_VERSION);
     }
     wp_enqueue_script('atelier-main', get_template_directory_uri() . '/assets/js/main.js', [], ATELIER_VERSION, true);
 });
 
 add_filter('body_class', function ($classes) {
-    if (function_exists('is_woocommerce') && (is_woocommerce() || is_cart() || is_checkout() || is_account_page())) $classes[] = 'atelier-commerce';
+    if (atelier_is_commerce_context()) $classes[] = 'atelier-commerce';
     return $classes;
 });
 

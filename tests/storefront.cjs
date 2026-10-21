@@ -69,6 +69,8 @@ assert(['127.0.0.1', 'localhost'].includes(new URL(base).hostname), 'Tests creat
     page.setDefaultNavigationTimeout(60000);
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${base}/shop/?s=zz-no-such-product&post_type=product&atelier_lang=ru`);
+    assert.match(await page.locator('link#atelier-commerce-css').getAttribute('href'), /\/assets\/css\/commerce\.css(?:\?|$)/);
+    assert((await page.locator('body').getAttribute('class')).split(/\s+/).includes('atelier-commerce'));
     assert.equal(await page.locator('.empty-catalog-action a').innerText(), 'Посмотреть все товары');
     const reset = new URL(await page.locator('.filter-reset').getAttribute('href'), base);
     assert.equal(reset.searchParams.has('s'), false);

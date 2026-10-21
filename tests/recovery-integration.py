@@ -58,6 +58,16 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
 ''')
     names = []
     try:
+        def wait_for_site(port):
+            deadline = time.monotonic() + 300
+            while time.monotonic() < deadline:
+                try:
+                    with urlopen(f'http://127.0.0.1:{port}/', timeout=30) as response:
+                        if response.status == 200: return
+                except Exception: pass
+                time.sleep(2)
+            raise RuntimeError('Disposable WordPress did not become ready.')
+
         def start(label, port, data_dir=None, mail=False):
             name = 'atelier-recovery-' + label + '-' + secrets.token_hex(3)
             names.append(name)
@@ -73,14 +83,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
             if data_dir is not None:
                 command.extend(['-v', f'{data_dir}:/var/lib/atelier'])
             run(*command, IMAGE)
-            deadline = time.monotonic() + 300
-            while time.monotonic() < deadline:
-                try:
-                    with urlopen(f'http://127.0.0.1:{port}/', timeout=30) as response:
-                        if response.status == 200: return name
-                except Exception: pass
-                time.sleep(2)
-            raise RuntimeError('Disposable WordPress did not become ready.')
+            wait_for_site(port)
+            return name
         def wp(name, mode):
             print(run('docker', 'exec', name, 'wp', 'eval-file', '/fixture-wp.php', mode, '--path=/var/www/html', '--allow-root'), flush=True)
         donor = start('donor', 18087)
@@ -88,6 +92,7 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         print('PASS: recovery commands drain stdout/stderr while piping string and file input.', flush=True)
         run('docker', 'exec', donor, 'git', 'init', '--bare', '-b', 'main', '/fixture/remote.git')
         wp(donor, 'seed')
+        wp(donor, 'commerce-search')
         run('docker', 'exec', donor, 'php', '/fixture/operation.php', 'save')
         status = json.loads(run('docker', 'exec', donor, 'php', '/fixture/operation.php', 'status'))
         if status.get('database_bytes', 0) <= 0 or status.get('media_bytes', 0) <= 0:
@@ -145,7 +150,39 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         legacy = start('legacy-layout', 18089, legacy_disk)
         run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/current/2025/kept.webp')
         run('docker', 'exec', legacy, 'test', '-L', '/var/www/html/wp-content/uploads')
-        print('PASS: legacy persistent uploads migrated to the swappable directory.', flush=True)
+        run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
+        run('docker', 'exec', legacy, 'rm', '/var/lib/atelier/uploads/current/2025/kept.webp')
+        run('docker', 'restart', legacy)
+        wait_for_site(18089)
+        run('docker', 'exec', legacy, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/kept.webp')
+        run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/2025/kept.webp')
+        print('PASS: legacy uploads migrate once and do not reappear after deletion and restart.', flush=True)
+        preexisting_current_disk = fixture / 'preexisting-current-disk'
+        (preexisting_current_disk / 'uploads' / 'current').mkdir(parents=True)
+        old_upload = preexisting_current_disk / 'uploads' / '2025' / 'deleted.webp'
+        old_upload.parent.mkdir(parents=True)
+        old_upload.write_bytes(b'legacy copy already deleted from current')
+        preexisting = start('preexisting-current', 18092, preexisting_current_disk)
+        run('docker', 'exec', preexisting, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/deleted.webp')
+        run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
+        run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/2025/deleted.webp')
+        print('PASS: upgrade does not re-import legacy files when current already existed.', flush=True)
+        interrupted_migration_disk = fixture / 'interrupted-migration-disk'
+        old_tree = interrupted_migration_disk / 'uploads' / '2025'
+        current_tree = interrupted_migration_disk / 'uploads' / 'current' / '2025'
+        old_tree.mkdir(parents=True)
+        current_tree.mkdir(parents=True)
+        (old_tree / 'new.webp').write_bytes(b'legacy file not copied before interruption')
+        (old_tree / 'kept.webp').write_bytes(b'stale legacy file')
+        (current_tree / 'kept.webp').write_bytes(b'new current file')
+        (interrupted_migration_disk / 'uploads' / '.atelier-legacy-uploads-in-progress').write_text('resume')
+        interrupted_migration = start('interrupted-migration', 18093, interrupted_migration_disk)
+        run('docker', 'exec', interrupted_migration, 'test', '-f', '/var/lib/atelier/uploads/current/2025/new.webp')
+        run('docker', 'exec', interrupted_migration, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
+        run('docker', 'exec', interrupted_migration, 'test', '!', '-e', '/var/lib/atelier/uploads/.atelier-legacy-uploads-in-progress')
+        check_current = run('docker', 'exec', interrupted_migration, 'cat', '/var/lib/atelier/uploads/current/2025/kept.webp')
+        if check_current != 'new current file': raise RuntimeError('Interrupted migration overwrote a newer current file.')
+        print('PASS: interrupted legacy migration resumes without replacing newer files.', flush=True)
         interrupted_disk = fixture / 'interrupted-disk'
         previous_uploads = interrupted_disk / 'uploads' / '.atelier-previous-interrupted' / '2025'
         previous_uploads.mkdir(parents=True)
