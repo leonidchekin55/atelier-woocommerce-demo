@@ -19,6 +19,56 @@ def run(*command, expected=0, timeout=300):
         raise RuntimeError(f'{command[0]} failed with exit {result.returncode}; diagnostics suppressed.')
     return result.stdout.strip()
 
+def check_legacy_upload_migration():
+    entrypoint = (ROOT / 'railway/entrypoint.sh').read_text()
+    start = entrypoint.index('legacy_migration_marker="$DATA_DIR/uploads/.atelier-legacy-uploads-migrated"')
+    end = entrypoint.index('\nmkdir -p /var/www/html/wp-content/uploads', start)
+    block = entrypoint[start:end]
+    script = 'set -Eeuo pipefail\nDATA_DIR="$1"\nrecovery_ready="$2"\nmkdir -p "$DATA_DIR/uploads/current"\n' + block + '\n'
+
+    def migrate(root, recovery_ready):
+        run('bash', '-c', script, 'legacy-migration-fixture', str(root), str(recovery_ready))
+
+    with tempfile.TemporaryDirectory(prefix='atelier-migration-snapshot-') as folder:
+        root = Path(folder)
+        uploads = root / 'uploads'
+        (uploads / 'current').mkdir(parents=True)
+        old = uploads / '2025' / 'excluded.webp'
+        old.parent.mkdir(parents=True)
+        old.write_bytes(b'not present in the authoritative snapshot')
+        (uploads / '.atelier-legacy-uploads-in-progress').write_text('discard after recovery')
+        migrate(root, 1)
+        if (uploads / 'current' / '2025' / 'excluded.webp').exists():
+            raise RuntimeError('Verified media snapshot was polluted with a stale legacy upload.')
+        if not (uploads / '.atelier-legacy-uploads-migrated').is_file():
+            raise RuntimeError('Verified snapshot did not finish legacy migration state.')
+        if (uploads / '.atelier-legacy-uploads-in-progress').exists():
+            raise RuntimeError('Verified snapshot left an interrupted migration marker behind.')
+
+    with tempfile.TemporaryDirectory(prefix='atelier-migration-resume-') as folder:
+        root = Path(folder)
+        uploads = root / 'uploads'
+        old = uploads / '2025'
+        current = uploads / 'current' / '2025'
+        old.mkdir(parents=True)
+        current.mkdir(parents=True)
+        (old / 'missing.webp').write_bytes(b'legacy file from incomplete migration')
+        (old / 'kept.webp').write_bytes(b'stale legacy version')
+        (current / 'kept.webp').write_bytes(b'newer current version')
+        (uploads / '.atelier-legacy-uploads-in-progress').write_text('resume')
+        migrate(root, 0)
+        if (current / 'missing.webp').read_bytes() != b'legacy file from incomplete migration':
+            raise RuntimeError('Interrupted legacy migration did not copy a missing upload.')
+        if (current / 'kept.webp').read_bytes() != b'newer current version':
+            raise RuntimeError('Interrupted legacy migration replaced a newer upload.')
+        (current / 'missing.webp').unlink()
+        migrate(root, 0)
+        if (current / 'missing.webp').exists():
+            raise RuntimeError('Completed migration restored a deleted legacy upload.')
+    print('PASS: legacy migration honors verified snapshots, resumes incomplete copies and keeps completed deletions.', flush=True)
+
+check_legacy_upload_migration()
+
 with tempfile.TemporaryDirectory(prefix='atelier-offline-recovery-') as folder:
     fixture = Path(folder)
     fixture.chmod(0o755)
@@ -58,17 +108,27 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
 ''')
     names = []
     try:
-        def wait_for_site(port):
+        def wait_for_site(name, port):
             deadline = time.monotonic() + 300
             while time.monotonic() < deadline:
                 try:
                     with urlopen(f'http://127.0.0.1:{port}/', timeout=30) as response:
                         if response.status == 200: return
                 except Exception: pass
+                status = run('docker', 'inspect', '--format', '{{.State.Status}}', name)
+                if status != 'running':
+                    raw_logs = subprocess.run(['docker', 'logs', '--tail', '80', name], capture_output=True, text=True)
+                    logs = raw_logs.stdout + raw_logs.stderr
+                    for value in [*runtime.values(), 'local-fixture-only', 'fictional-local-password', 'offline-fixture-key']:
+                        if value: logs = logs.replace(str(value), '[redacted]')
+                    details = [line.strip()[-300:] for line in logs.splitlines()
+                               if any(word in line.lower() for word in ('recovery', 'fatal', 'error', 'warning', 'exception'))]
+                    suffix = (' ' + ' | '.join(details[-6:])) if details else ''
+                    raise RuntimeError(f'Disposable WordPress container stopped during startup ({status}).{suffix}')
                 time.sleep(2)
             raise RuntimeError('Disposable WordPress did not become ready.')
 
-        def start(label, port, data_dir=None, mail=False, recovery=False):
+        def start(label, port, data_dir=None, mail=False):
             name = 'atelier-recovery-' + label + '-' + secrets.token_hex(3)
             names.append(name)
             command = ['docker', 'run', '-d', '--name', name, '-p', f'127.0.0.1:{port}:80',
@@ -82,10 +142,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
                     '-e', 'BREVO_OWNER_EMAIL=atelier-owner@example.invalid'])
             if data_dir is not None:
                 command.extend(['-v', f'{data_dir}:/var/lib/atelier'])
-            if recovery:
-                for key, value in runtime.items(): command.extend(['-e', f'{key}={value}'])
             run(*command, IMAGE)
-            wait_for_site(port)
+            wait_for_site(name, port)
             return name
         def wp(name, mode):
             print(run('docker', 'exec', name, 'wp', 'eval-file', '/fixture-wp.php', mode, '--path=/var/www/html', '--allow-root'), flush=True)
@@ -155,42 +213,12 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
         run('docker', 'exec', legacy, 'rm', '/var/lib/atelier/uploads/current/2025/kept.webp')
         run('docker', 'restart', legacy)
-        wait_for_site(18089)
+        wait_for_site(legacy, 18089)
         run('docker', 'exec', legacy, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/kept.webp')
         run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/2025/kept.webp')
         print('PASS: legacy uploads migrate once and do not reappear after deletion and restart.', flush=True)
         run('docker', 'rm', '-fv', legacy)
         names.remove(legacy)
-        preexisting_current_disk = fixture / 'preexisting-current-disk'
-        (preexisting_current_disk / 'uploads' / 'current').mkdir(parents=True)
-        old_upload = preexisting_current_disk / 'uploads' / '2025' / 'deleted.webp'
-        old_upload.parent.mkdir(parents=True)
-        old_upload.write_bytes(b'legacy copy already deleted from current')
-        preexisting = start('preexisting-current', 18092, preexisting_current_disk, recovery=True)
-        run('docker', 'exec', preexisting, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/deleted.webp')
-        run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
-        run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/2025/deleted.webp')
-        print('PASS: upgrade does not re-import legacy files when current already existed.', flush=True)
-        run('docker', 'rm', '-fv', preexisting)
-        names.remove(preexisting)
-        interrupted_migration_disk = fixture / 'interrupted-migration-disk'
-        old_tree = interrupted_migration_disk / 'uploads' / '2025'
-        current_tree = interrupted_migration_disk / 'uploads' / 'current' / '2025'
-        old_tree.mkdir(parents=True)
-        current_tree.mkdir(parents=True)
-        (old_tree / 'new.webp').write_bytes(b'legacy file not copied before interruption')
-        (old_tree / 'kept.webp').write_bytes(b'stale legacy file')
-        (current_tree / 'kept.webp').write_bytes(b'new current file')
-        (interrupted_migration_disk / 'uploads' / '.atelier-legacy-uploads-in-progress').write_text('resume')
-        interrupted_migration = start('interrupted-migration', 18093, interrupted_migration_disk)
-        run('docker', 'exec', interrupted_migration, 'test', '-f', '/var/lib/atelier/uploads/current/2025/new.webp')
-        run('docker', 'exec', interrupted_migration, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
-        run('docker', 'exec', interrupted_migration, 'test', '!', '-e', '/var/lib/atelier/uploads/.atelier-legacy-uploads-in-progress')
-        check_current = run('docker', 'exec', interrupted_migration, 'cat', '/var/lib/atelier/uploads/current/2025/kept.webp')
-        if check_current != 'new current file': raise RuntimeError('Interrupted migration overwrote a newer current file.')
-        print('PASS: interrupted legacy migration resumes without replacing newer files.', flush=True)
-        run('docker', 'rm', '-fv', interrupted_migration)
-        names.remove(interrupted_migration)
         interrupted_disk = fixture / 'interrupted-disk'
         previous_uploads = interrupted_disk / 'uploads' / '.atelier-previous-interrupted' / '2025'
         previous_uploads.mkdir(parents=True)

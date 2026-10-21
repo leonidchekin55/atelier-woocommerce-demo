@@ -13,14 +13,14 @@ docker build -t atelier-audit-improved:latest .
 ATELIER_TEST_IMAGE=atelier-audit-improved:latest python3 tests/recovery-integration.py
 ```
 
-Requires Docker and Python 3; ports 18087–18093 must be free. The test replaces
+Requires Docker and Python 3; ports 18087–18091 must be free. The test replaces
 the entire donor container/database and removes all containers and temporary
 recovery data afterward. It verifies a native WooCommerce order, private inbox
 message/subscriber, newly uploaded attachment and generated thumbnails, refusal
 of missing/corrupt media or a symlink in uploads before SQL import, one-time
-migration of files from the previous persistent-disk uploads path (including
-restart checks proving deleted legacy files stay deleted and interrupted
-migrations resume without overwriting newer files), startup recovery of the old
+migration of files from the previous persistent-disk uploads path (a container
+restart proves deleted files stay deleted, and shell checks cover interrupted
+migrations resuming without overwriting newer files), startup recovery of the old
 tree after an interrupted directory swap, and an upgrade check that prefers a
 verified snapshot over stale legacy files even if `current` already existed. It
 verifies that product searches enqueue commerce styles without styling regular
