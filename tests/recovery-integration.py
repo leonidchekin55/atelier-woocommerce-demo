@@ -68,7 +68,7 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
                 time.sleep(2)
             raise RuntimeError('Disposable WordPress did not become ready.')
 
-        def start(label, port, data_dir=None, mail=False):
+        def start(label, port, data_dir=None, mail=False, recovery=False):
             name = 'atelier-recovery-' + label + '-' + secrets.token_hex(3)
             names.append(name)
             command = ['docker', 'run', '-d', '--name', name, '-p', f'127.0.0.1:{port}:80',
@@ -82,6 +82,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
                     '-e', 'BREVO_OWNER_EMAIL=atelier-owner@example.invalid'])
             if data_dir is not None:
                 command.extend(['-v', f'{data_dir}:/var/lib/atelier'])
+            if recovery:
+                for key, value in runtime.items(): command.extend(['-e', f'{key}={value}'])
             run(*command, IMAGE)
             wait_for_site(port)
             return name
@@ -164,7 +166,7 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         old_upload = preexisting_current_disk / 'uploads' / '2025' / 'deleted.webp'
         old_upload.parent.mkdir(parents=True)
         old_upload.write_bytes(b'legacy copy already deleted from current')
-        preexisting = start('preexisting-current', 18092, preexisting_current_disk)
+        preexisting = start('preexisting-current', 18092, preexisting_current_disk, recovery=True)
         run('docker', 'exec', preexisting, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/deleted.webp')
         run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
         run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/2025/deleted.webp')

@@ -15,67 +15,7 @@ if [[ ! -e "$DATA_DIR/uploads/current" && ! -L "$DATA_DIR/uploads/current" ]]; t
   done
   shopt -u nullglob
 fi
-legacy_current_existed=0
-if [[ -e "$DATA_DIR/uploads/current" || -L "$DATA_DIR/uploads/current" ]]; then
-  legacy_current_existed=1
-fi
-# Older releases stored uploads directly in /var/lib/atelier/uploads. Copy
-# that layout only when the swappable current directory has not been created
-# before. Keep the source files as a recovery copy, but never import them again
-# after migration: doing so could resurrect a file deleted by a later snapshot.
-legacy_migration_marker="$DATA_DIR/uploads/.atelier-legacy-uploads-migrated"
-legacy_migration_in_progress="$DATA_DIR/uploads/.atelier-legacy-uploads-in-progress"
-for marker in "$legacy_migration_marker" "$legacy_migration_in_progress"; do
-  if [[ -L "$marker" || ( -e "$marker" && ! -f "$marker" ) ]]; then
-    echo 'Legacy uploads migration marker must be a regular file.' >&2
-    exit 1
-  fi
-done
-if [[ ! -f "$legacy_migration_marker" && ! -f "$legacy_migration_in_progress" ]]; then
-  if (( legacy_current_existed )); then
-    # Older releases already created current before migrating the flat layout.
-    # Its presence means the legacy files may now be stale; mark them as handled.
-    touch "$legacy_migration_marker"
-  else
-    # Mark first, so a stop between here and mkdir/copy resumes the migration.
-    touch "$legacy_migration_in_progress"
-  fi
-fi
 mkdir -p "$DATA_DIR/uploads/current"
-if [[ -f "$legacy_migration_marker" && -f "$legacy_migration_in_progress" ]]; then
-  rm "$legacy_migration_in_progress"
-fi
-if [[ ! -f "$legacy_migration_marker" && -f "$legacy_migration_in_progress" ]]; then
-  copy_legacy_upload() {
-    local source_path="$1" destination_path="$2" child
-    if [[ -L "$source_path" || ! -d "$source_path" ]]; then
-      if [[ ! -e "$destination_path" && ! -L "$destination_path" ]]; then
-        cp -a "$source_path" "$destination_path"
-      fi
-      return 0
-    fi
-    if [[ -e "$destination_path" || -L "$destination_path" ]]; then
-      if [[ -L "$destination_path" || ! -d "$destination_path" ]]; then return 0; fi
-      for child in "$source_path"/*; do
-        copy_legacy_upload "$child" "$destination_path/$(basename "$child")"
-      done
-      return 0
-    fi
-    cp -a "$source_path" "$destination_path"
-  }
-
-  # A no-clobber recursive merge resumes cleanly after interruption and keeps
-  # any newer file already present in current.
-  shopt -s dotglob nullglob
-  for item in "$DATA_DIR/uploads"/*; do
-    [[ "$item" == "$DATA_DIR/uploads/current" ]] && continue
-    [[ "$(basename "$item")" == .atelier-* ]] && continue
-    copy_legacy_upload "$item" "$DATA_DIR/uploads/current/$(basename "$item")"
-  done
-  shopt -u dotglob nullglob
-  touch "$legacy_migration_marker"
-  rm "$legacy_migration_in_progress"
-fi
 chown -R mysql:mysql /run/mysqld "$DATA_DIR/mysql"
 chown -R www-data:www-data "$DATA_DIR/uploads"
 
@@ -110,6 +50,7 @@ then
 fi
 unset db_password
 
+recovery_ready=0
 if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
   if php /usr/local/lib/atelier-state.php restore; then
     recovery_ready=1
@@ -126,6 +67,58 @@ if [[ -n "${ATELIER_STATE_REPO:-}" ]]; then
     echo 'A prior local recovery marker exists but the remote snapshot is missing; refusing bootstrap.' >&2
     exit 1
   fi
+fi
+
+# Legacy uploads must not be merged over a verified snapshot: the snapshot is
+# the authoritative file set and may intentionally exclude old/deleted files.
+# If recovery is not configured or the remote is still empty, copy the legacy
+# tree once and resume safely after interruption, preserving current files.
+legacy_migration_marker="$DATA_DIR/uploads/.atelier-legacy-uploads-migrated"
+legacy_migration_in_progress="$DATA_DIR/uploads/.atelier-legacy-uploads-in-progress"
+for marker in "$legacy_migration_marker" "$legacy_migration_in_progress"; do
+  if [[ -L "$marker" || ( -e "$marker" && ! -f "$marker" ) ]]; then
+    echo 'Legacy uploads migration marker must be a regular file.' >&2
+    exit 1
+  fi
+done
+if [[ -f "$legacy_migration_marker" && -f "$legacy_migration_in_progress" ]]; then
+  rm "$legacy_migration_in_progress"
+fi
+if [[ ! -f "$legacy_migration_marker" ]]; then
+  if (( recovery_ready )); then
+    touch "$legacy_migration_marker"
+  else
+    if [[ ! -f "$legacy_migration_in_progress" ]]; then
+      touch "$legacy_migration_in_progress"
+    fi
+    copy_legacy_upload() {
+      local source_path="$1" destination_path="$2" child
+      if [[ -L "$source_path" || ! -d "$source_path" ]]; then
+        if [[ ! -e "$destination_path" && ! -L "$destination_path" ]]; then
+          cp -a "$source_path" "$destination_path"
+        fi
+        return 0
+      fi
+      if [[ -e "$destination_path" || -L "$destination_path" ]]; then
+        if [[ -L "$destination_path" || ! -d "$destination_path" ]]; then return 0; fi
+        for child in "$source_path"/*; do
+          copy_legacy_upload "$child" "$destination_path/$(basename "$child")"
+        done
+        return 0
+      fi
+      cp -a "$source_path" "$destination_path"
+    }
+
+    shopt -s dotglob nullglob
+    for item in "$DATA_DIR/uploads"/*; do
+      [[ "$item" == "$DATA_DIR/uploads/current" ]] && continue
+      [[ "$(basename "$item")" == .atelier-* ]] && continue
+      copy_legacy_upload "$item" "$DATA_DIR/uploads/current/$(basename "$item")"
+    done
+    shopt -u dotglob nullglob
+  fi
+  touch "$legacy_migration_marker"
+  if [[ -f "$legacy_migration_in_progress" ]]; then rm "$legacy_migration_in_progress"; fi
 fi
 
 mkdir -p /var/www/html/wp-content/uploads
