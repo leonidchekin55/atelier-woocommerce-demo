@@ -157,6 +157,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         run('docker', 'exec', legacy, 'test', '!', '-e', '/var/lib/atelier/uploads/current/2025/kept.webp')
         run('docker', 'exec', legacy, 'test', '-f', '/var/lib/atelier/uploads/2025/kept.webp')
         print('PASS: legacy uploads migrate once and do not reappear after deletion and restart.', flush=True)
+        run('docker', 'rm', '-fv', legacy)
+        names.remove(legacy)
         preexisting_current_disk = fixture / 'preexisting-current-disk'
         (preexisting_current_disk / 'uploads' / 'current').mkdir(parents=True)
         old_upload = preexisting_current_disk / 'uploads' / '2025' / 'deleted.webp'
@@ -167,6 +169,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/.atelier-legacy-uploads-migrated')
         run('docker', 'exec', preexisting, 'test', '-f', '/var/lib/atelier/uploads/2025/deleted.webp')
         print('PASS: upgrade does not re-import legacy files when current already existed.', flush=True)
+        run('docker', 'rm', '-fv', preexisting)
+        names.remove(preexisting)
         interrupted_migration_disk = fixture / 'interrupted-migration-disk'
         old_tree = interrupted_migration_disk / 'uploads' / '2025'
         current_tree = interrupted_migration_disk / 'uploads' / 'current' / '2025'
@@ -183,6 +187,8 @@ catch (Throwable $e) { fwrite(STDERR, "Recovery operation refused.\\n"); exit(1)
         check_current = run('docker', 'exec', interrupted_migration, 'cat', '/var/lib/atelier/uploads/current/2025/kept.webp')
         if check_current != 'new current file': raise RuntimeError('Interrupted migration overwrote a newer current file.')
         print('PASS: interrupted legacy migration resumes without replacing newer files.', flush=True)
+        run('docker', 'rm', '-fv', interrupted_migration)
+        names.remove(interrupted_migration)
         interrupted_disk = fixture / 'interrupted-disk'
         previous_uploads = interrupted_disk / 'uploads' / '.atelier-previous-interrupted' / '2025'
         previous_uploads.mkdir(parents=True)
